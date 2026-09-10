@@ -21,8 +21,8 @@
   Skip the verify_env.py import smoke test.
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File .github\skills\setup-environment\scripts\setup.ps1
-  powershell -ExecutionPolicy Bypass -File .github\skills\setup-environment\scripts\setup.ps1 -Force -Run
+  powershell -ExecutionPolicy Bypass -File .cursor\skills\setup-environment\scripts\setup.ps1
+  powershell -ExecutionPolicy Bypass -File .cursor\skills\setup-environment\scripts\setup.ps1 -Force -Run
 #>
 [CmdletBinding()]
 param(
@@ -33,7 +33,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Resolve project root: scripts/ -> setup-environment/ -> skills/ -> .github/ -> ROOT
+# Resolve project root: scripts/ -> setup-environment/ -> skills/ -> .cursor/ -> ROOT
 $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Resolve-Path (Join-Path $ScriptDir '..\..\..\..')
 Set-Location $ProjectRoot

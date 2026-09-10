@@ -49,13 +49,13 @@ Verify imports (fastapi, langchain, faiss, sqlalchemy, mcp …)
 ### Windows (PowerShell)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .github\skills\setup-environment\scripts\setup.ps1
+powershell -ExecutionPolicy Bypass -File .cursor\skills\setup-environment\scripts\setup.ps1
 ```
 
 ### macOS / Linux
 
 ```bash
-bash .github/skills/setup-environment/scripts/setup.sh
+bash .cursor/skills/setup-environment/scripts/setup.sh
 ```
 
 The script is idempotent: re-running only patches whatever is missing.
@@ -197,7 +197,7 @@ The app writes the SQLite DB and FAISS index cache here on first launch.
 ### 8. Verify
 
 ```powershell
-.\.venv\Scripts\python.exe .github\skills\setup-environment\scripts\verify_env.py
+.\.venv\Scripts\python.exe .cursor\skills\setup-environment\scripts\verify_env.py
 ```
 
 This script imports the critical packages and validates the model provider variables.
@@ -229,7 +229,7 @@ Open <http://127.0.0.1:8001/docs> to confirm.
 ## Files in this skill
 
 ```
-.github/skills/setup-environment/
+.cursor/skills/setup-environment/
 ├── SKILL.md           ← this file
 └── scripts/
     ├── setup.ps1      ← one-shot bootstrapper for Windows

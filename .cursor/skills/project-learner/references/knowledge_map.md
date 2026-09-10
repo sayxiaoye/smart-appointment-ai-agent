@@ -85,4 +85,4 @@
 | D9.2 | Qwen/OpenAI-compatible/Azure 配置 | `config/model_provider.py`, `.env.example` | RQ05 |
 | D9.3 | LangChain vs Semantic Kernel | `requirements.txt`, `agents/`, `services/` | RQ07 |
 | D9.4 | Agent 评估体系 | `tests/`, `agents/`, `services/` | RQ11 |
-| D9.5 | 测试、环境配置与运行验证 | `tests/`, `.github/skills/setup-environment/` | RQ11 |
+| D9.5 | 测试、环境配置与运行验证 | `tests/`, `.cursor/skills/setup-environment/` | RQ11 |
