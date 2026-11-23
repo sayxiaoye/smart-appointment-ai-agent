@@ -82,19 +82,23 @@ class TaskClassificationAgent:
         # 与预约无关的请求应该重新进行分类，而不是直接拒绝
         print(f"[DEBUG] 预约机器人转交的请求：{user_input}")
         
-        # 重新进行任务分类
+        # 重新进行任务分类，并记下预约机器人已经拒绝过这句话
         result = ""
-        async for token in self.classification_processor.process_task_stream(user_input):
+        async for token in self.classification_processor.process_task_stream(
+            user_input, rejected_by="appointment"
+        ):
             result += token
         return result
 
     async def handle_unrelated_async(self, user_input):
         """处理无关请求（异步流版本）"""
-        # 与预约无关的请求应该重新进行分类，而不是直接拒绝
-        print(f"[DEBUG] 预约机器人转交的请求：{user_input}")
+        # 与咨询无关的请求应该重新进行分类，而不是直接拒绝
+        print(f"[DEBUG] 咨询机器人转交的请求：{user_input}")
         
-        # 重新进行任务分类
-        async for token in self.classification_processor.process_task_stream(user_input):
+        # 重新进行任务分类，并记下咨询机器人已经拒绝过这句话
+        async for token in self.classification_processor.process_task_stream(
+            user_input, rejected_by="consultant"
+        ):
             yield token
 
     # ===========================================

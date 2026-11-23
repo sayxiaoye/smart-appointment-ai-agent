@@ -8,7 +8,8 @@
 4. 提供统一的流程入口
 """
 
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
+from agents.appointment.message_builder import is_status_question
 from .task_classifier import TaskClassifier
 from .state_manager import StateManager
 from .agent_router import AgentRouter
@@ -36,8 +37,10 @@ class ClassificationProcessor:
         self.state_manager = state_manager
         self.agent_router = agent_router
         self.unrelated_handler = unrelated_handler
+        self._reject_depth = 0
+        self._rejected_agents = set()
     
-    async def process_task_stream(self, task: str) -> AsyncGenerator[str, None]:
+    async def process_task_stream(self, task: str, rejected_by: Optional[str] = None) -> AsyncGenerator[str, None]:
         """
         流式处理任务分类和路由
         
@@ -47,23 +50,32 @@ class ClassificationProcessor:
         Yields:
             str: 流式响应内容
         """
+        outermost = self._reject_depth == 0
+        self._reject_depth += 1
+        if rejected_by:
+            self._rejected_agents.add(rejected_by)
         try:
+            # 同一句话最多转交三次，避免预约和咨询互相拒绝时递归
+            if self._reject_depth > 3:
+                async for token in self.unrelated_handler.handle_unrelated_async(task):
+                    yield token
+                return
+
+            # 刚被当前流程里的机器人拒绝过，就不能按原状态再送回去
+            rejected_current_flow = (
+                self.state_manager.is_in_appointment_flow() and "appointment" in self._rejected_agents
+            ) or (
+                self.state_manager.is_in_consultation_flow() and "consultant" in self._rejected_agents
+            )
+            if rejected_current_flow:
+                self.state_manager.reset_to_classify()
+
             # 检查是否需要进行分类
             if self.state_manager.should_classify():
                 # 进行任务分类
                 category = await self.task_classifier.classify_task(task)
-                
-                # 根据分类结果路由
-                if category == "appointment" and self.agent_router.appointment_agent:
-                    async for token in self.agent_router.route_to_appointment(task):
-                        yield token
-                elif category == "query" and self.agent_router.consultant_agent:
-                    async for token in self.agent_router.route_to_consultation(task):
-                        yield token
-                else:
-                    # 不支持的任务类型
-                    async for token in self.agent_router.handle_unsupported_task(category):
-                        yield token
+                async for token in self._route_classified_task(task, category):
+                    yield token
             else:
                 # 根据当前状态继续处理
                 async for token in self.agent_router.route_by_state(task):
@@ -73,6 +85,31 @@ class ClassificationProcessor:
             # 处理异常情况
             yield f"[ERROR]处理任务时发生错误: {str(e)}"
             self.state_manager.force_reset()
+        finally:
+            self._reject_depth -= 1
+            if outermost:
+                self._rejected_agents.clear()
+
+    async def _route_classified_task(self, task: str, category: str) -> AsyncGenerator[str, None]:
+        """按分类转交。已经拒绝过这句话的机器人不会再收到它。"""
+        if category == "appointment" and "appointment" not in self._rejected_agents and self.agent_router.appointment_agent:
+            async for token in self.agent_router.route_to_appointment(task):
+                yield token
+            return
+        if category == "query" and "consultant" not in self._rejected_agents and self.agent_router.consultant_agent:
+            async for token in self.agent_router.route_to_consultation(task):
+                yield token
+            return
+        if is_status_question(task) and self.agent_router.appointment_agent and hasattr(self.agent_router.appointment_agent, "stream_status"):
+            async for token in self.agent_router.appointment_agent.stream_status():
+                yield token
+            return
+        if category in ("appointment", "query"):
+            async for token in self.unrelated_handler.handle_unrelated_async(task):
+                yield token
+            return
+        async for token in self.agent_router.handle_unsupported_task(category):
+            yield token
     
     async def process_task_sync(self, task: str) -> str:
         """

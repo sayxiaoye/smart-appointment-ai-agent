@@ -9,6 +9,7 @@ from .appointment import (
     MessageBuilder, 
     AppointmentDatabase
 )
+from .appointment.message_builder import is_status_question
 
 load_dotenv()
 
@@ -92,6 +93,11 @@ class AppointmentAgent:
         """
         if user_input is None:
             user_input = input("用户：")
+
+        if is_status_question(user_input):
+            async for token in self.stream_status():
+                yield token
+            return
         
         # 1. 解析用户输入（内部 JSON，不向用户流式输出，避免英文字段名暴露在聊天界面）
         ai_content = ""
@@ -143,6 +149,25 @@ class AppointmentAgent:
                 
         except Exception as e:
             yield self.message_builder.create_parse_error_message()
+
+    async def stream_status(self):
+        """回答当前预约进度，不重新抽取预约槽位，也不转交给其他机器人。"""
+        saved = self._latest_saved_appointment()
+        reply = self.message_builder.create_status_message(self.appointment_history, saved)
+        yield f"[REPLY][预约机器人]{reply}"
+
+    def _latest_saved_appointment(self):
+        try:
+            records = self.appointment_database.user_behavior_service.get_user_behaviors(
+                "default_user", action_type="appointment"
+            )
+        except Exception:
+            return None
+        for record in records or []:
+            data = record.get("action_data") or {}
+            if data.get("game") or data.get("start_time"):
+                return data
+        return None
 
     def _reset_state_after_appointment(self):
         """预约完成后重置状态"""

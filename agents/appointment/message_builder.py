@@ -8,6 +8,20 @@ from typing import Dict, Any, List
 from config.constants import host_type_label, is_known
 
 
+def is_status_question(text: str) -> bool:
+    """判断用户是在查当前预约，而不是在发起新预约。"""
+    normalized = (text or "").strip().replace(" ", "")
+    if not normalized:
+        return False
+    if any(item in normalized for item in ("我要预约", "帮我预约", "想预约", "预约一场", "帮我约")) and "状态" not in normalized:
+        return False
+    markers = (
+        "预约状态", "当前预约", "我的预约", "预约进度",
+        "查预约", "预约了吗", "约了什么", "有没有预约", "约好了吗",
+    )
+    return any(item in normalized for item in markers)
+
+
 class MessageBuilder:
     """消息构建器"""
 
@@ -106,6 +120,35 @@ class MessageBuilder:
         if history.get("duration_defaulted") and history.get("game"):
             prefix = f"时长先按《{history['game']}》的建议 {history.get('duration')} 安排。"
         return "\n" + prefix + question + "\n"
+
+    def create_status_message(self, appointment_history: Dict[str, Any], saved: Dict[str, Any] = None) -> str:
+        history = appointment_history or {}
+        parts = []
+        if is_known(history.get("game")) or is_known(history.get("start_time")):
+            bits = []
+            if is_known(history.get("game")):
+                bits.append(f"《{history['game']}》")
+            if is_known(history.get("player_count")):
+                bits.append(f"{history['player_count']}人")
+            if is_known(history.get("start_time")):
+                bits.append(str(history["start_time"]))
+            if is_known(history.get("host_type")):
+                bits.append(host_type_label(history.get("host_type")))
+            parts.append("进行中的预约：" + "，".join(bits) + "。")
+        if saved and (saved.get("game") or saved.get("start_time")):
+            saved_bits = []
+            if saved.get("game"):
+                saved_bits.append(f"《{saved['game']}》")
+            if saved.get("player_count"):
+                saved_bits.append(f"{saved['player_count']}人")
+            if saved.get("start_time"):
+                saved_bits.append(str(saved["start_time"]))
+            if saved.get("host_type"):
+                saved_bits.append(host_type_label(saved.get("host_type")))
+            parts.append("最近一次已确认：" + "，".join(saved_bits) + "。")
+        if not parts:
+            return "\n机器人：当前没有进行中的预约，也没有已确认的场次。可以直接告诉我想玩的游戏、人数和时间。\n"
+        return "\n机器人：" + "".join(parts) + "\n"
 
     def create_unrelated_message(self) -> str:
         return "[REPLY][预约机器人]抱歉，我只能处理桌游预约。您可以告诉我想玩的游戏、人数、时间和主持方式。\n"
