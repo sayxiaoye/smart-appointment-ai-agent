@@ -55,9 +55,31 @@
             100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
         }
         
+        .home-btn {
+            position: absolute;
+            z-index: 2;
+            top: 18px;
+            left: 18px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: white;
+            text-decoration: none;
+            background: rgba(255,255,255,0.22);
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .home-btn:hover {
+            background: rgba(255,255,255,0.35);
+        }
+
         .header h2 {
             font-size: 28px;
             font-weight: 600;
+            margin-top: 28px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -271,6 +293,7 @@
 <body>
     <div class="container">
         <div class="header">
+            <a href="/" class="home-btn"><i class="fas fa-home"></i> 返回主页</a>
             <h2><i class="fas fa-chart-line"></i> 用户行为分析</h2>
             <p>基于历史预约数据的智能分析</p>
         </div>
