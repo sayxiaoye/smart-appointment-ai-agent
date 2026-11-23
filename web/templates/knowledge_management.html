@@ -765,25 +765,32 @@
                     })
                 });
                 
+                if (!response.ok) {
+                    const errorBody = await response.json().catch(() => ({}));
+                    throw new Error(errorBody.detail || '搜索失败');
+                }
+
                 const data = await response.json();
-                displaySearchResults(data);
+                displaySearchResults(data, query);
                 
             } catch (error) {
                 console.error('搜索失败:', error);
-                showAlert('搜索失败', 'error', 'searchResults');
+                showAlert(error.message || '搜索失败', 'error', 'searchResults');
             }
         }
         
         // 显示搜索结果
-        function displaySearchResults(data) {
+        function displaySearchResults(data, queryText) {
             const container = document.getElementById('searchResults');
+            const results = Array.isArray(data.results) ? data.results : [];
+            const query = data.query || queryText;
             
-            if (data.results.length === 0) {
+            if (results.length === 0) {
                 container.innerHTML = `
                     <div class="knowledge-list">
                         <div class="knowledge-item">
                             <div style="text-align: center; color: #666;">
-                                🔍 未找到与 "${data.query}" 相关的知识
+                                🔍 未找到与 "${query}" 相关的知识
                             </div>
                         </div>
                     </div>
@@ -792,9 +799,9 @@
             }
             
             const html = `
-                <h4>🎯 搜索结果 (查询: "${data.query}", 找到 ${data.total_found} 条)</h4>
+                <h4>🎯 搜索结果 (查询: "${query}", 找到 ${data.total_found ?? results.length} 条)</h4>
                 <div class="knowledge-list">
-                    ${data.results.map((doc, index) => `
+                    ${results.map((doc, index) => `
                         <div class="knowledge-item search-result">
                             <div class="knowledge-content">
                                 ${doc.content}

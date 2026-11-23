@@ -2,7 +2,7 @@
 知识库管理API
 """
 from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/knowledge", tags=["知识库管理"])
@@ -17,6 +17,8 @@ class KnowledgeItem(BaseModel):
 
 class SearchRequest(BaseModel):
     query: str
+    top_k: int = 5
+    category: Optional[str] = None
 
 
 @router.get("/")
@@ -144,11 +146,16 @@ async def search_knowledge(request: SearchRequest):
         knowledge_service = KnowledgeService()
         if not knowledge_service.initialized:
             await knowledge_service.initialize()
-        results = await knowledge_service.search(request.query)
+        results = await knowledge_service.search(
+            request.query,
+            top_k=request.top_k,
+            category=request.category or None,
+        )
         return {
             "status": "success",
-            "data": results,
-            "count": len(results)
+            "query": request.query,
+            "results": results,
+            "total_found": len(results),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"搜索知识库失败: {str(e)}")
