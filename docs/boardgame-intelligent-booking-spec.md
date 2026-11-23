@@ -98,7 +98,7 @@ Web → API → Agents(Graph) → Services → DB
 | `router` | `task_classification/task_classifier.py` |
 | `consult` | `consultant/*` + RAG |
 | `extract_slots` / `validate_slots` | `appointment/input_parser.py` |
-| `match_host` / `availability` | `appointment/technician_finder.py` |
+| `match_host` / `availability` | `appointment/host_finder.py` |
 | `confirm` / `write_booking` | `appointment/appointment_processor.py` + DB |
 | 行为分析（异步） | `user_behavior_agent.py`（不进主图热路径） |
 

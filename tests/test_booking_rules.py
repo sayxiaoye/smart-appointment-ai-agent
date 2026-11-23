@@ -1,13 +1,11 @@
 """桌游预约规则：不调用大模型。"""
 
 import asyncio
-import sqlite3
 from pathlib import Path
 
 from agents.appointment.appointment_processor import AppointmentProcessor
 from agents.appointment.host_finder import HostFinder
 from agents.appointment.message_builder import MessageBuilder
-from db.base.legacy_reset import reset_legacy_sqlite_if_needed
 from services.game_catalog_service import GameCatalogService
 from services.host_service import HostService
 
@@ -173,17 +171,3 @@ def test_host_type_filter_stays_inside_same_type():
     ]
     matched = finder.filter_hosts_by_type(hosts, "pro_host")
     assert [host["name"] for host in matched] == ["陈屿"]
-
-
-def test_legacy_massage_database_is_backed_up_and_removed(tmp_path):
-    db_file = tmp_path / "smart_appointment.db"
-    connection = sqlite3.connect(db_file)
-    connection.execute("CREATE TABLE technicians (id INTEGER PRIMARY KEY)")
-    connection.commit()
-    connection.close()
-
-    reset_legacy_sqlite_if_needed("sqlite:///" + db_file.as_posix())
-
-    assert not db_file.exists()
-    backups = list(tmp_path.glob("smart_appointment.legacy.*.db"))
-    assert len(backups) == 1

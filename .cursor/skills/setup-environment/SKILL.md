@@ -100,7 +100,7 @@ Before installing dependencies or launching the app, ensure `.env` has real mode
 This project uses **two different model capabilities**:
 
 1. **Chat LLM**: used by the appointment, consultation, task-classification, and user-behavior agents to understand user messages and generate replies.
-2. **Embedding model**: used by RAG retrieval and technician similarity matching to convert text into vectors.
+2. **Embedding model**: used by RAG retrieval and host similarity matching to convert text into vectors.
 
 Do not assume every provider offers both. Chat and embedding settings are intentionally separated in `.env`:
 

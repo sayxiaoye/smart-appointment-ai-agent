@@ -35,19 +35,19 @@
 
 | ID | 知识点 | 关键文件 | 关联真题 |
 |----|--------|----------|----------|
-| D4.1 | 强结构数据不分块策略 | `services/knowledge_service.py`, `services/technician_service.py` | RQ04 |
+| D4.1 | 强结构数据不分块策略 | `services/knowledge_service.py`, `services/host_service.py` | RQ04 |
 | D4.2 | 长文本递归字符分块策略 | `services/knowledge_service.py` | RQ04 |
 | D4.3 | 知识加载、embedding 与 FAISS 索引 | `services/knowledge_service.py` | RQ05 |
 | D4.4 | RAG 质量评估指标 | `tests/`, `services/knowledge_service.py` | RQ06 |
 | D4.5 | 知识问答功能与咨询 Agent | `agents/consultant_agent.py`, `agents/consultant/` | RQ13 |
 
-## D5 技师推荐与 Embedding/FAISS
+## D5 主持人推荐与 Embedding/FAISS
 
 | ID | 知识点 | 关键文件 | 关联真题 |
 |----|--------|----------|----------|
 | D5.1 | create_embedding_model 配置 | `config/model_provider.py` | RQ05 |
 | D5.2 | find_best_match_indices 匹配流程 | `services/text_embedding.py` | RQ05 |
-| D5.3 | 技师信息实体画像与推荐 | `services/technician_service.py`, `agents/appointment/technician_finder.py` | RQ04 |
+| D5.3 | 主持人信息实体画像与推荐 | `services/host_service.py`, `agents/appointment/host_finder.py` | RQ04 |
 | D5.4 | embedding 缓存与性能成本 | `services/text_embedding.py`, `data/` | RQ10 |
 
 ## D6 用户行为学习与主动推荐

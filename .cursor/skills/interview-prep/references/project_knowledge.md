@@ -31,13 +31,13 @@
 - `agents/appointment_agent.py`: `run_stream`, `appointment_history`, reset 时机。
 - `agents/appointment/input_parser.py`: 用户输入结构化抽取。
 - `agents/appointment/appointment_processor.py`: 完整/不完整预约处理、推荐确认。
-- `agents/appointment/technician_finder.py`: 技师匹配。
+- `agents/appointment/host_finder.py`: 主持人匹配。
 - `agents/appointment/appointment_database.py`: 预约数据操作。
 
 要能解释：
-- 哪些字段决定预约是否完整：gender、start_time、duration、project、preference、technician 等。
+- 哪些字段决定预约是否完整：game、host_type、player_count、start_time、duration、host_name 等。
 - 为什么解析结构化数据后再更新历史，再判断 unrelated/finished。
-- 推荐技师确认时为什么不能直接 reset。
+- 推荐主持人确认时为什么不能直接 reset。
 
 ## RAG 与知识问答
 
@@ -47,21 +47,21 @@
 - `agents/consultant/`: 咨询分类、知识检索、Prompt 构建、回答生成。
 
 真实问题答题要点：
-- 强结构数据如技师信息可不分块，保持完整实体画像。
+- 强结构数据如主持人信息可不分块，保持完整实体画像。
 - 长文本如规则/介绍可用递归字符分块，并设置 overlap。
 - 小规模可用 SQLite + FAISS，本地轻量；大规模可迁移 Milvus/Pinecone/Weaviate。
 - RAG 评估可以覆盖 hit rate、MRR、context precision、faithfulness、业务回答满意度。
 
-## 技师匹配与 Embedding
+## 主持人匹配与 Embedding
 
 关键代码：
 - `services/text_embedding.py`: `find_best_match_indices`, `embed_input`, FAISS IndexFlatL2。
-- `services/technician_service.py`: 技师数据初始化和管理。
-- `agents/appointment/technician_finder.py`: 推荐入口。
+- `services/host_service.py`: 主持人数据初始化和管理。
+- `agents/appointment/host_finder.py`: 推荐入口。
 
 注意点：
 - 如果使用 L2 距离，需要说明 embedding 是否归一化；若归一化，L2 与余弦排序近似一致。
-- 候选技师重复 embedding 会带来延迟成本，应说明缓存策略。
+- 候选主持人重复 embedding 会带来延迟成本，应说明缓存策略。
 
 ## 用户行为学习与推荐
 

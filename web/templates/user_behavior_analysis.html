@@ -289,7 +289,7 @@
             <div class="stats-grid" id="analysisData">
                 <div class="stat-card">
                     <div class="stat-title">常约主持人</div>
-                    <div id="favoriteTechnician" class="stat-value primary">正在加载...</div>
+                    <div id="favoriteHost" class="stat-value primary">正在加载...</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-title">常玩游戏</div>
@@ -362,7 +362,7 @@
                 console.log('开始加载用户分析数据...');
                 
                 // 使用与服务器一致的地址和端口
-                const apiUrl = 'http://127.0.0.1:8000/api/user-behavior/analysis';
+                const apiUrl = '/api/user-behavior/analysis';
                 console.log('调用API:', apiUrl);
                 
                 const response = await fetch(apiUrl, {
@@ -384,7 +384,7 @@
                 document.getElementById('debug-info').textContent = `调试：API成功返回，共${data.total_appointments}次预约`;
                 
                 const elements = {
-                    'favoriteTechnician': data.favorite_host_name || '无',
+                    'favoriteHost': data.favorite_host_name || '无',
                     'favoriteService': data.favorite_service || '无', 
                     'favoriteDuration': data.favorite_duration ? `${data.favorite_duration}分钟` : '无',
                     'daysSinceLastAppointment': data.days_since_last_appointment !== null ? `${data.days_since_last_appointment}天` : '无',
@@ -418,7 +418,7 @@
                 document.getElementById('debug-info').textContent = `调试：API调用失败 - ${error.message}`;
                 
                 // 显示错误信息
-                const elements = ['favoriteTechnician', 'favoriteService', 'favoriteDuration', 'daysSinceLastAppointment'];
+                const elements = ['favoriteHost', 'favoriteService', 'favoriteDuration', 'daysSinceLastAppointment'];
                 elements.forEach(id => {
                     const element = document.getElementById(id);
                     if (element) {
@@ -438,7 +438,7 @@
                 button.disabled = true;
                 button.classList.add('loading');
                 
-                const response = await fetch('http://127.0.0.1:8000/api/user-behavior/send-reminder', {
+                const response = await fetch('/api/user-behavior/send-reminder', {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
