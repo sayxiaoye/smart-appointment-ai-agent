@@ -20,18 +20,18 @@ class TestAppointmentAgentCoreFeatures:
         """
         测试：预约代理应该能从自然语言中提取预约信息
         
-        用户说："我想预约明天下午2点的按摩，女技师"
+        用户说："我想预约明天下午2点玩卡卡颂，4个人，自助"
         应该提取到：
-        - 时间: 明天下午2点 
-        - 项目: 按摩  
-        - 性别偏好: 女
+        - 时间: 明天下午2点
+        - 游戏: 卡卡颂
+        - 主持类型: 自助
         
         这个测试验证整个自然语言处理流程：
         用户输入 -> LLM处理 -> JSON解析 -> 结果验证
         """
         agent = AppointmentAgent()
         
-        user_input = "我想预约明天下午2点的按摩，女技师"
+        user_input = "我想预约明天下午2点玩卡卡颂，4个人，自助"
         
         # 使用真实的解析流程：通过LLM处理用户输入
         from langchain_core.chat_history import InMemoryChatMessageHistory
@@ -46,8 +46,9 @@ class TestAppointmentAgentCoreFeatures:
         result = agent.input_parser.parse_data(ai_content)
         
         # 验证解析结果包含预期信息
-        assert result["project"] == "按摩", f"应该提取到按摩项目，但得到：{result['project']}"
-        assert result["gender"] == "女", f"应该提取到女技师偏好，但得到：{result['gender']}"
+        from config.constants import normalize_host_type
+        assert "卡卡颂" in str(result.get("game")), f"应该提取到卡卡颂，但得到：{result.get('game')}"
+        assert normalize_host_type(result.get("host_type")) == "self_play", f"应该提取到自助，但得到：{result.get('host_type')}"
         
         # 验证时间信息（明天下午2点应该被转换为标准格式）
         start_time = result["start_time"]
@@ -62,33 +63,26 @@ class TestAppointmentAgentCoreFeatures:
         测试：预约代理应该正确跟踪预约状态
         
         用户分步骤提供信息：
-        1. "我要预约按摩" -> 应该记录项目=按摩，其他为空
-        2. "明天下午2点" -> 应该记录时间，保持项目=按摩
-        3. "女技师" -> 应该记录性别偏好，保持之前信息
+        1. "我要预约卡卡颂" -> 应该记录游戏=卡卡颂
+        2. "明天下午2点" -> 应该记录时间，并保持游戏
         """
         agent = AppointmentAgent()
-        
-        # 检查初始状态
-        assert agent.appointment_history["project"] is None
-        assert agent.appointment_history["start_time"] is None 
-        assert agent.appointment_history["gender"] is None
-        
-        # 这个测试可能会失败，因为我们需要验证状态更新逻辑
-        # 但这正是我们要测试的功能是否正确工作
-        
-        # 模拟第一次输入
-        data1 = {"project": "按摩"}
+
+        assert agent.appointment_history["game"] is None
+        assert agent.appointment_history["start_time"] is None
+        assert agent.appointment_history["host_type"] is None
+
+        data1 = {"game": "卡卡颂"}
         agent.appointment_processor.update_history_from_data(agent.appointment_history, data1)
-        
-        assert agent.appointment_history["project"] == "按摩"
-        assert agent.appointment_history["start_time"] is None  # 应该保持为空
-        
-        # 模拟第二次输入  
-        data2 = {"start_time": "明天下午2点"}
+
+        assert agent.appointment_history["game"] == "卡卡颂"
+        assert agent.appointment_history["start_time"] is None
+
+        data2 = {"start_time": "2026-11-24 14:00"}
         agent.appointment_processor.update_history_from_data(agent.appointment_history, data2)
-        
-        assert agent.appointment_history["project"] == "按摩"  # 应该保持
-        assert agent.appointment_history["start_time"] == "明天下午2点"
+
+        assert agent.appointment_history["game"] == "卡卡颂"
+        assert agent.appointment_history["start_time"] == "2026-11-24 14:00"
     
     def test_should_identify_unrelated_requests(self):
         """
@@ -120,29 +114,28 @@ class TestAppointmentAgentCoreFeatures:
         """
         测试：当收集到所有必需信息时，应该完成预约
         
-        提供完整信息：时间、项目、性别偏好等
-        应该标记 finished=True
+        提供游戏、人数、自助和开始时间后应该完成，时长用目录建议值补上。
         """
         agent = AppointmentAgent()
-        
-        # 提供完整的预约信息
+
         complete_data = {
-            "start_time": "明天下午2点",
-            "project": "按摩", 
-            "gender": "女",
-            "duration": "60分钟"
+            "start_time": "2026-11-24 14:00",
+            "game": "卡卡颂",
+            "host_type": "自助",
+            "player_count": 4,
         }
-        
-        # 更新预约历史
+
         finished = agent.appointment_processor.update_history_from_data(
-            agent.appointment_history, 
+            agent.appointment_history,
             complete_data
         )
-        
-        # 应该标记为完成（这个测试可能会失败，需要检查完成逻辑）
-        assert finished == True, f"提供完整信息后应该完成预约，但finished={finished}"
-        assert agent.appointment_history["start_time"] == "明天下午2点"
-        assert agent.appointment_history["project"] == "按摩"
+
+        assert finished is True, f"提供完整信息后应该完成预约，但finished={finished}"
+        assert agent.appointment_history["game"] == "卡卡颂"
+        assert agent.appointment_history["host_type"] == "self_play"
+        assert agent.appointment_history["player_count"] == 4
+        assert agent.appointment_history["duration"] == "45分钟"
+        assert agent.appointment_processor.requires_host(agent.appointment_history) is False
     
     @pytest.mark.asyncio
     async def test_should_handle_incomplete_info_gracefully(self):
@@ -153,28 +146,25 @@ class TestAppointmentAgentCoreFeatures:
         """
         agent = AppointmentAgent()
         
-        # 只提供项目，缺少时间等信息
-        incomplete_data = {"project": "按摩"}
-        
+        incomplete_data = {"game": "卡卡颂"}
+
         finished = agent.appointment_processor.update_history_from_data(
             agent.appointment_history,
-            incomplete_data  
+            incomplete_data
         )
-        
-        # 不应该完成预约
-        assert finished == False, "信息不完整时不应该完成预约"
-        
-        # 应该能处理不完整信息（不抛出异常）
+
+        assert finished is False, "信息不完整时不应该完成预约"
+
         try:
             response_tokens = []
-            async for token in agent.appointment_processor.handle_incomplete_info(incomplete_data):
+            async for token in agent.appointment_processor.handle_incomplete_info(
+                incomplete_data, agent.appointment_history
+            ):
                 response_tokens.append(token)
-            
+
             response = "".join(response_tokens)
-            
-            # 应该包含引导性问题（这个断言可能会失败，但能看到实际输出）
             assert len(response) > 0, "应该返回引导信息"
-            assert "时间" in response or "什么时候" in response, f"应该询问时间信息，但得到：{response}"
+            assert "几点" in response or "玩家" in response or "主持" in response, f"应该追问缺失信息，但得到：{response}"
             
         except Exception as e:
             pytest.fail(f"处理不完整信息时出错：{e}")
@@ -204,14 +194,12 @@ class TestAppointmentAgentEdgeCases:
         agent = AppointmentAgent()
         
         # 设置一些状态
-        agent.appointment_history["project"] = "按摩"
+        agent.appointment_history["game"] = "卡卡颂"
         agent.appointment_history["start_time"] = "明天"
         agent.finished = True
-        
-        # 重置
+
         agent.reset()
-        
-        # 应该回到初始状态
-        assert agent.appointment_history["project"] is None
+
+        assert agent.appointment_history["game"] is None
         assert agent.appointment_history["start_time"] is None
-        assert agent.finished == False
+        assert agent.finished is False

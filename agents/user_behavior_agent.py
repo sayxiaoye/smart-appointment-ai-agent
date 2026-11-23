@@ -59,26 +59,24 @@ class UserBehaviorAgent:
         """初始化通用聊天模型"""
         return create_chat_model(temperature=0.7)
     
-    def record_behavior(self, action_type: str, action_data: Dict[str, Any], 
-                       technician_id: str = None, session_id: str = "default_session") -> bool:
+    def record_behavior(self, action_type: str, action_data: Dict[str, Any],
+                       host_id: str = None, session_id: str = "default_session") -> bool:
         """记录用户行为"""
         try:
-            # 优先使用Services层，保持向后兼容
             return self.user_behavior_service.record_behavior(
-                user_id="default_user",  # 统一使用default_user作为用户ID
+                user_id="default_user",
                 action_type=action_type,
                 action_data=action_data,
-                technician_id=technician_id,
+                host_id=host_id,
                 session_id=session_id
             )
         except Exception as e:
             self.logger.error(f"记录用户行为失败: {str(e)}")
-            # 回退到原有方法
             try:
                 return self.behavior_recorder.record_behavior(
                     action_type=action_type,
                     action_data=action_data,
-                    technician_id=technician_id,
+                    host_id=host_id,
                     session_id=session_id
                 )
             except Exception as fallback_error:
@@ -102,7 +100,7 @@ class UserBehaviorAgent:
                 days_since_last = (datetime.now() - last_appointment).days
             
             return {
-                'favorite_technician_id': preferences.get('favorite_technician_id'),
+                'favorite_host_id': preferences.get('favorite_host_id'),
                 'favorite_service': preferences.get('favorite_service'),
                 'favorite_duration': preferences.get('favorite_duration'),
                 'total_appointments': preferences.get('total_appointments'),
@@ -130,47 +128,40 @@ class UserBehaviorAgent:
             
             # 获取用户分析数据
             analysis = self.get_user_analysis(user_id)
-            if not analysis or not analysis.get('favorite_technician_id'):
+            if not analysis or not analysis.get('favorite_host_id'):
                 self.logger.info("没有找到用户偏好数据，使用默认消息")
-                return "尊敬的Tom，您好！好久没见了，要不要预约一个按摩放松一下？"
-            
+                return "尊敬的Tom，您好！好久没见了，要不要再约一局桌游？"
+
             self.logger.info(f"用户分析数据: {analysis}")
-            
-            # 获取技师信息
-            from db import TechnicianDBRouter
-            tech_db = TechnicianDBRouter()
-            tech_info = tech_db.get_technician_by_id(analysis['favorite_technician_id'])
-            
-            tech_name = tech_info.get('name', '您偏爱的技师') if tech_info else '您偏爱的技师'
-            tech_strength = tech_info.get('strength', '') if tech_info else ''
-            service = analysis.get('favorite_service', '按摩')
+
+            from db import HostDBRouter
+            host_db = HostDBRouter()
+            host_info = host_db.get_host_by_id(analysis['favorite_host_id'])
+
+            host_name = host_info.get('name', '您常约的主持人') if host_info else '您常约的主持人'
+            specialty = host_info.get('specialty', '') if host_info else ''
+            game = analysis.get('favorite_service', '桌游')
             duration = analysis.get('favorite_duration', 60)
-            
-            self.logger.info(f"技师信息: {tech_name}, 特长: {tech_strength}")
-            
-            # 格式化可用时间
+
             times_text = "、".join([t["formatted"] for t in (available_times or [])[:3]]) if available_times else "暂时没有空闲时间"
-            self.logger.info(f"格式化后的时间: {times_text}")
-            
-            # 构建LLM提示
-            prompt = f"""请为健康理疗店生成一条温暖的回访消息。
+
+            prompt = f"""请为桌游店生成一条温暖的回访消息。
 
 客户信息：
 - 称呼：尊敬的Tom
-- 最喜欢的理疗师：{tech_name}
-- 理疗师特长：{tech_strength}
-- 常用服务：{service.replace('按摩', '理疗')}
+- 常约主持人：{host_name}
+- 主持人专长：{specialty}
+- 常玩的游戏：{game}
 - 常用时长：{duration}分钟
-- 理疗师空闲时间：{times_text}
+- 主持人空闲时间：{times_text}
 
 要求：
-1. 语气亲切温暖，像老朋友一样
-2. 提到理疗师的名字和特长
-3. 结合客户的使用习惯
-4. 如果有空闲时间，自然地提及具体时间
-5. 最后邀请客户预约
-6. 控制在80字以内
-7. 直接输出消息内容，不要任何标记"""
+1. 语气亲切温暖
+2. 提到主持人和常玩的游戏
+3. 如果有空闲时间，自然地提及具体时间
+4. 最后邀请客户再约一局
+5. 控制在80字以内
+6. 直接输出消息内容，不要任何标记"""
             
             self.logger.info(f"准备调用LLM，提示内容长度: {len(prompt)}")
             
@@ -192,33 +183,32 @@ class UserBehaviorAgent:
         try:
             # 获取用户分析数据
             analysis = self.get_user_analysis(user_id)
-            if not analysis or not analysis.get('favorite_technician_id'):
+            if not analysis or not analysis.get('favorite_host_id'):
                 message = await self.generate_personalized_reminder(user_id, [])
                 return {
                     "message": message,
-                    "technician_available_times": []
+                    "host_available_times": []
                 }
-            
-            tech_id = analysis['favorite_technician_id']
+
+            host_id = analysis['favorite_host_id']
             duration = analysis.get('favorite_duration', 60)
-            
-            # 查询技师的空闲时间
-            from db import TechnicianDBRouter
+
+            from db import HostDBRouter
             from datetime import datetime, timedelta
-            
-            db = TechnicianDBRouter()
+
+            db = HostDBRouter()
             today = datetime.now()
             available_times = []
             
             # 检查今天从当前时间到晚上22点的空闲时段
             current_hour = datetime.now().hour
-            start_hour = max(current_hour + 1, 9)  # 从下一小时开始，但不早于9点
-            
-            for hour in range(start_hour, 22):  # 9点到22点营业时间
+            start_hour = max(current_hour + 1, 12)
+
+            for hour in range(start_hour, 22):
                 check_time = today.replace(hour=hour, minute=0, second=0, microsecond=0)
                 end_time = check_time + timedelta(minutes=duration)
-                
-                if db.is_technician_available(tech_id, check_time, end_time):
+
+                if db.is_host_available(host_id, check_time, end_time):
                     available_times.append({
                         "date": today.strftime("%Y-%m-%d"),
                         "time": f"{hour}:00",
@@ -228,11 +218,11 @@ class UserBehaviorAgent:
             # 如果今天没有空闲时间，检查明天
             if not available_times:
                 tomorrow = today + timedelta(days=1)
-                for hour in range(9, 22):  # 9点到22点营业时间
+                for hour in range(12, 22):
                     check_time = tomorrow.replace(hour=hour, minute=0, second=0, microsecond=0)
                     end_time = check_time + timedelta(minutes=duration)
-                    
-                    if db.is_technician_available(tech_id, check_time, end_time):
+
+                    if db.is_host_available(host_id, check_time, end_time):
                         available_times.append({
                             "date": tomorrow.strftime("%Y-%m-%d"),
                             "time": f"{hour}:00",
@@ -246,12 +236,12 @@ class UserBehaviorAgent:
             
             return {
                 "message": message,
-                "technician_available_times": available_times
+                "host_available_times": available_times
             }
-            
+
         except Exception as e:
             self.logger.error(f"获取提醒信息失败: {type(e).__name__}: {str(e)}")
             return {
-                "message": "尊敬的Tom，您好！系统暂时无法查询技师时间，请稍后再试或直接联系我们预约。",
-                "technician_available_times": []
+                "message": "尊敬的Tom，您好！系统暂时无法查询主持人时间，请稍后再试或直接联系我们预约。",
+                "host_available_times": []
             }

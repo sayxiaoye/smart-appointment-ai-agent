@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>技师状态管理</title>
+    <title>主持人状态</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -239,27 +239,22 @@
         <div class="header">
             <h2>
                 <i class="fas fa-users"></i>
-                技师状态管理
+                主持人状态
             </h2>
-            <p>实时查看技师工作状态和个人信息</p>
+            <p>查看主持人类型和专长</p>
         </div>
         
         <div class="content">
             <div class="stats-grid">
                 <div class="stat-card">
                     <i class="fas fa-users"></i>
-                    <div class="number">{{ technicians|length }}</div>
-                    <div class="label">总技师数</div>
+                    <div class="number">{{ hosts|length }}</div>
+                    <div class="label">主持人</div>
                 </div>
                 <div class="stat-card">
                     <i class="fas fa-user-check"></i>
-                    <div class="number">{{ technicians|selectattr('gender', 'equalto', '男')|list|length }}</div>
-                    <div class="label">男技师</div>
-                </div>
-                <div class="stat-card">
-                    <i class="fas fa-user-check"></i>
-                    <div class="number">{{ technicians|selectattr('gender', 'equalto', '女')|list|length }}</div>
-                    <div class="label">女技师</div>
+                    <div class="number">{{ hosts|length }}</div>
+                    <div class="label">可预约</div>
                 </div>
             </div>
             
@@ -267,29 +262,20 @@
                 <table>
                     <thead>
                         <tr>
-                            <th><i class="fas fa-id-badge"></i> 技师ID</th>
+                            <th><i class="fas fa-id-badge"></i> 主持人ID</th>
                             <th><i class="fas fa-user"></i> 姓名</th>
-                            <th><i class="fas fa-venus-mars"></i> 性别</th>
-                            <th><i class="fas fa-dumbbell"></i> 力气/倾向</th>
+                            <th><i class="fas fa-tags"></i> 主持类型</th>
+                            <th><i class="fas fa-star"></i> 专长</th>
                             <th><i class="fas fa-info-circle"></i> 状态</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for tech in technicians %}
+                        {% for host in hosts %}
                         <tr>
-                            <td><strong>{{ tech.id }}</strong></td>
-                            <td>{{ tech.name }}</td>
-                            <td>
-                                {% if tech.gender %}
-                                    <span class="gender-badge {{ 'gender-male' if tech.gender == '男' else 'gender-female' }}">
-                                        <i class="fas {{ 'fa-mars' if tech.gender == '男' else 'fa-venus' }}"></i>
-                                        {{ tech.gender }}
-                                    </span>
-                                {% else %}
-                                    <span style="color: #999;">未设置</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ tech.strength or '标准' }}</td>
+                            <td><strong>{{ host.id }}</strong></td>
+                            <td>{{ host.name }}</td>
+                            <td>{{ host.host_type_labels | join('、') }}</td>
+                            <td>{{ host.specialty or '未填写' }}</td>
                             <td>
                                 <span class="status-badge status-available">
                                     <i class="fas fa-check-circle"></i>

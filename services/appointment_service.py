@@ -15,96 +15,85 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class AppointmentService:
     """预约服务类"""
-    
-    def __init__(self, db_path: str = 'sqlite:///data/smart_appointment.db'):
+
+    def __init__(self, db_path: str = "sqlite:///data/smart_appointment.db"):
         self.db_router = DatabaseRouter(db_path)
-        self.technician_repo = self.db_router.technicians
-    
-    def save_appointment(self, technician_id: str, start_time: datetime, 
-                        end_time: datetime, appointment_history: Dict[str, Any], 
+        self.host_repo = self.db_router.hosts
+
+    def save_appointment(self, host_id, start_time: datetime,
+                        end_time: datetime, appointment_history: Dict[str, Any],
                         session_id: str) -> bool:
-        """保存预约信息到数据库"""
+        """保存预约。自助场次不占用主持人档期。"""
         try:
+            if host_id in (None, "", "None"):
+                logger.info(
+                    "自助场次已确认：游戏=%s，时间=%s 到 %s",
+                    appointment_history.get("game"), start_time, end_time,
+                )
+                return True
+
             appointment_id = int(time.time() * 1000)
-            
-            # 保存预约到数据库
-            self.technician_repo.add_schedule(
-                technician_id=int(technician_id),
+            self.host_repo.add_schedule(
+                host_id=int(host_id),
                 start_time=start_time,
                 end_time=end_time,
                 status="busy",
-                appointment_id=appointment_id
+                appointment_id=appointment_id,
             )
-            
-            logger.info(f"预约信息已保存到数据库：技师ID={technician_id}, 时间={start_time} 到 {end_time}, 预约ID={appointment_id}")
+            logger.info("预约已保存：主持人ID=%s, 时间=%s 到 %s", host_id, start_time, end_time)
             return True
-            
-        except Exception as e:
-            logger.error(f"保存预约信息到数据库失败：{e}")
+        except Exception as exc:
+            logger.error("保存预约失败：%s", exc)
             return False
-    
-    def get_technician_by_id(self, technician_id: int) -> Optional[Dict[str, Any]]:
-        """根据ID获取技师信息"""
+
+    def get_host_by_id(self, host_id: int) -> Optional[Dict[str, Any]]:
         try:
-            return self.technician_repo.get_technician_by_id(technician_id)
-        except Exception as e:
-            logger.error(f"获取技师信息失败：{e}")
+            return self.host_repo.get_host_by_id(host_id)
+        except Exception as exc:
+            logger.error("获取主持人信息失败：%s", exc)
             return None
-    
-    def get_technician_by_name(self, name: str) -> Optional[Dict[str, Any]]:
-        """根据姓名获取技师信息"""
+
+    def get_host_by_name(self, name: str) -> Optional[Dict[str, Any]]:
         try:
-            return self.technician_repo.get_technician_by_name(name)
-        except Exception as e:
-            logger.error(f"获取技师信息失败：{e}")
+            return self.host_repo.get_host_by_name(name)
+        except Exception as exc:
+            logger.error("获取主持人信息失败：%s", exc)
             return None
-    
-    def get_all_technicians(self) -> List[Dict[str, Any]]:
-        """获取所有技师信息"""
+
+    def get_all_hosts(self) -> List[Dict[str, Any]]:
         try:
-            return self.technician_repo.get_all_technicians()
-        except Exception as e:
-            logger.error(f"获取技师列表失败：{e}")
+            return self.host_repo.get_all_hosts()
+        except Exception as exc:
+            logger.error("获取主持人列表失败：%s", exc)
             return []
-    
-    def get_technicians_by_gender(self, gender: str) -> List[Dict[str, Any]]:
-        """根据性别获取技师信息"""
+
+    def get_hosts_by_type(self, host_type: str) -> List[Dict[str, Any]]:
         try:
-            return self.technician_repo.get_technicians_by_gender(gender)
-        except Exception as e:
-            logger.error(f"根据性别获取技师信息失败：{e}")
+            return self.host_repo.get_hosts_by_type(host_type)
+        except Exception as exc:
+            logger.error("按主持类型获取主持人失败：%s", exc)
             return []
-    
-    def get_technician_schedules(self, technician_id: int, date) -> List[Dict[str, Any]]:
-        """获取技师排班信息"""
+
+    def get_host_schedules(self, host_id: int, date) -> List[Dict[str, Any]]:
         try:
-            return self.technician_repo.get_technician_schedules(technician_id, date)
-        except Exception as e:
-            logger.error(f"获取技师排班信息失败：{e}")
+            return self.host_repo.get_host_schedules(host_id, date)
+        except Exception as exc:
+            logger.error("获取主持人排班失败：%s", exc)
             return []
-    
-    def is_technician_available(self, technician_id: int, start_time: datetime, end_time: datetime) -> bool:
-        """检查技师是否可用"""
+
+    def is_host_available(self, host_id: int, start_time: datetime, end_time: datetime) -> bool:
         try:
-            return self.technician_repo.is_technician_available(technician_id, start_time, end_time)
-        except Exception as e:
-            logger.error(f"检查技师可用性失败：{e}")
+            return self.host_repo.is_host_available(host_id, start_time, end_time)
+        except Exception as exc:
+            logger.error("检查主持人可用性失败：%s", exc)
             return False
-    
-    def add_technician(self, name: str, gender: str = None, strength: str = None) -> Optional[int]:
-        """添加新技师"""
+
+    def get_all_specialties(self) -> List[str]:
         try:
-            return self.technician_repo.add_technician(name, gender, strength)
-        except Exception as e:
-            logger.error(f"添加技师失败：{e}")
-            return None
-    
-    def get_all_strengths(self) -> List[str]:
-        """获取所有技师的专长列表"""
-        try:
-            return self.technician_repo.get_all_strengths()
-        except Exception as e:
-            logger.error(f"获取技师专长列表失败：{e}")
+            return self.host_repo.get_all_specialties()
+        except Exception as exc:
+            logger.error("获取主持人专长失败：%s", exc)
             return []

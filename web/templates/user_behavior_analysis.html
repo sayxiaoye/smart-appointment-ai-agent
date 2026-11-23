@@ -288,11 +288,11 @@
             <!-- 用户分析数据 -->
             <div class="stats-grid" id="analysisData">
                 <div class="stat-card">
-                    <div class="stat-title">最喜欢的技师</div>
+                    <div class="stat-title">常约主持人</div>
                     <div id="favoriteTechnician" class="stat-value primary">正在加载...</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-title">常用服务项目</div>
+                    <div class="stat-title">常玩游戏</div>
                     <div id="favoriteService" class="stat-value success">正在加载...</div>
                 </div>
                 <div class="stat-card">
@@ -384,7 +384,7 @@
                 document.getElementById('debug-info').textContent = `调试：API成功返回，共${data.total_appointments}次预约`;
                 
                 const elements = {
-                    'favoriteTechnician': data.favorite_technician_name || '无',
+                    'favoriteTechnician': data.favorite_host_name || '无',
                     'favoriteService': data.favorite_service || '无', 
                     'favoriteDuration': data.favorite_duration ? `${data.favorite_duration}分钟` : '无',
                     'daysSinceLastAppointment': data.days_since_last_appointment !== null ? `${data.days_since_last_appointment}天` : '无',
@@ -463,10 +463,11 @@
                 
                 messageContent.textContent = data.message || '提醒消息生成成功！';
                 
-                if (data.technician_available_times && data.technician_available_times.length > 0) {
+                const slots = data.host_available_times || [];
+                if (slots.length > 0) {
                     availableTimes.innerHTML = `
                         <strong>建议预约时间：</strong><br>
-                        ${data.technician_available_times.map(time => `<span style="background: #f093fb; color: white; padding: 4px 8px; border-radius: 8px; margin: 2px; display: inline-block;">${time}</span>`).join('')}
+                        ${slots.map(time => `<span style="background: #f093fb; color: white; padding: 4px 8px; border-radius: 8px; margin: 2px; display: inline-block;">${time.formatted || time}</span>`).join('')}
                     `;
                 } else {
                     availableTimes.innerHTML = '';

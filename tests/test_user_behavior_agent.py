@@ -28,9 +28,9 @@ class TestUserBehaviorAgentCoreFeatures:
         behavior_data = {
             "user_id": "test_user_001",
             "action": "appointment_request",
-            "service_type": "按摩",
+            "service_type": "血染钟楼",
             "preferred_time": "下午",
-            "gender_preference": "女",
+            "host_type": "自助",
             "timestamp": datetime.now()
         }
         
@@ -47,7 +47,7 @@ class TestUserBehaviorAgentCoreFeatures:
             
             latest_behavior = recorded_behavior[0]
             assert latest_behavior["action"] == "appointment_request"
-            assert latest_behavior["service_type"] == "按摩"
+            assert latest_behavior["service_type"] == "血染钟楼"
             
         except Exception as e:
             pytest.fail(f"记录用户行为时出错：{e}")
@@ -63,10 +63,10 @@ class TestUserBehaviorAgentCoreFeatures:
         # 模拟多次行为记录
         user_id = "test_user_002"
         behaviors = [
-            {"user_id": user_id, "action": "appointment", "service_type": "按摩", "preferred_time": "下午"},
-            {"user_id": user_id, "action": "appointment", "service_type": "按摩", "preferred_time": "下午"},
-            {"user_id": user_id, "action": "appointment", "service_type": "推拿", "preferred_time": "上午"},
-            {"user_id": user_id, "action": "consultation", "topic": "按摩效果"},
+            {"user_id": user_id, "action": "appointment", "service_type": "血染钟楼", "preferred_time": "下午"},
+            {"user_id": user_id, "action": "appointment", "service_type": "血染钟楼", "preferred_time": "下午"},
+            {"user_id": user_id, "action": "appointment", "service_type": "卡卡颂", "preferred_time": "上午"},
+            {"user_id": user_id, "action": "consultation", "topic": "血染钟楼效果"},
         ]
         
         # 记录所有行为
@@ -80,9 +80,9 @@ class TestUserBehaviorAgentCoreFeatures:
             # 应该识别出偏好模式
             assert preferences is not None, "应该返回偏好分析结果"
             
-            # 应该识别出按摩是最常选择的服务（这个测试可能会失败）
+            # 应该识别出血染钟楼是最常选择的服务（这个测试可能会失败）
             preferred_service = preferences.get("preferred_service_type")
-            assert preferred_service == "按摩", f"应该识别按摩为偏好服务，但得到：{preferred_service}"
+            assert preferred_service == "血染钟楼", f"应该识别血染钟楼为偏好服务，但得到：{preferred_service}"
             
             # 应该识别出下午是偏好时间
             preferred_time = preferences.get("preferred_time")
@@ -103,8 +103,8 @@ class TestUserBehaviorAgentCoreFeatures:
         
         # 建立用户行为历史
         historical_behaviors = [
-            {"user_id": user_id, "service_type": "深层按摩", "satisfaction_rating": 5},
-            {"user_id": user_id, "service_type": "肩颈按摩", "satisfaction_rating": 4},
+            {"user_id": user_id, "service_type": "血染钟楼", "satisfaction_rating": 5},
+            {"user_id": user_id, "service_type": "卡卡颂", "satisfaction_rating": 4},
             {"user_id": user_id, "preferred_time": "周末", "completion_status": "completed"},
         ]
         
@@ -121,8 +121,8 @@ class TestUserBehaviorAgentCoreFeatures:
             
             # 推荐应该与用户历史偏好相关
             recommended_services = [rec.get("service_type", "") for rec in recommendations]
-            massage_related = any("按摩" in service for service in recommended_services)
-            assert massage_related, f"推荐应该包含按摩相关服务，但得到：{recommended_services}"
+            massage_related = any("血染钟楼" in service for service in recommended_services)
+            assert massage_related, f"推荐应该包含血染钟楼相关服务，但得到：{recommended_services}"
             
         except Exception as e:
             pytest.fail(f"生成个性化推荐时出错：{e}")
@@ -146,7 +146,7 @@ class TestUserBehaviorAgentCoreFeatures:
                 "user_id": user_id,
                 "action": "appointment_request",
                 "timestamp": base_time + timedelta(days=i*3),
-                "service_type": "按摩" if i % 2 == 0 else "推拿"
+                "service_type": "血染钟楼" if i % 2 == 0 else "卡卡颂"
             })
         
         # 添加一些取消记录
@@ -190,8 +190,8 @@ class TestUserBehaviorAgentCoreFeatures:
         
         # 创建有趣的行为数据用于洞察
         insight_data = [
-            {"user_id": user_id, "action": "consultation", "topic": "按摩效果", "timestamp": datetime.now()},
-            {"user_id": user_id, "action": "appointment", "service_type": "按摩", "timestamp": datetime.now()},
+            {"user_id": user_id, "action": "consultation", "topic": "血染钟楼效果", "timestamp": datetime.now()},
+            {"user_id": user_id, "action": "appointment", "service_type": "血染钟楼", "timestamp": datetime.now()},
             {"user_id": user_id, "action": "feedback", "rating": 5, "comment": "很满意"},
         ]
         
@@ -231,9 +231,9 @@ class TestUserBehaviorAgentDataManagement:
         
         # 设置用户偏好
         preferences = {
-            "preferred_service_types": ["按摩", "推拿"],
+            "preferred_service_types": ["血染钟楼", "卡卡颂"],
             "preferred_times": ["下午", "晚上"],
-            "gender_preference": "女",
+            "host_type": "自助",
             "communication_style": "详细"
         }
         
@@ -246,8 +246,8 @@ class TestUserBehaviorAgentDataManagement:
             
             # 应该能正确检索
             assert retrieved_prefs is not None, "应该能检索到偏好设置"
-            assert retrieved_prefs["gender_preference"] == "女"
-            assert "按摩" in retrieved_prefs["preferred_service_types"]
+            assert retrieved_prefs["host_type"] == "自助"
+            assert "血染钟楼" in retrieved_prefs["preferred_service_types"]
             
             # 更新偏好
             updated_prefs = {"preferred_times": ["上午"]}
@@ -270,10 +270,10 @@ class TestUserBehaviorAgentDataManagement:
         
         # 创建多个用户的数据
         users_data = [
-            {"user_id": "user_1", "service_type": "按摩", "satisfaction": 5},
-            {"user_id": "user_2", "service_type": "按摩", "satisfaction": 4},
-            {"user_id": "user_3", "service_type": "推拿", "satisfaction": 3},
-            {"user_id": "user_1", "service_type": "按摩", "satisfaction": 5},
+            {"user_id": "user_1", "service_type": "血染钟楼", "satisfaction": 5},
+            {"user_id": "user_2", "service_type": "血染钟楼", "satisfaction": 4},
+            {"user_id": "user_3", "service_type": "卡卡颂", "satisfaction": 3},
+            {"user_id": "user_1", "service_type": "血染钟楼", "satisfaction": 5},
         ]
         
         for data in users_data:
@@ -289,10 +289,10 @@ class TestUserBehaviorAgentDataManagement:
             # 应该返回聚合结果
             assert aggregated is not None, "应该返回聚合结果"
             
-            # 应该包含按摩和推拿的统计
+            # 应该包含血染钟楼和卡卡颂的统计
             service_stats = aggregated.get("service_type_stats", {})
-            assert "按摩" in str(service_stats), "聚合结果应该包含按摩统计"
-            assert "推拿" in str(service_stats), "聚合结果应该包含推拿统计"
+            assert "血染钟楼" in str(service_stats), "聚合结果应该包含血染钟楼统计"
+            assert "卡卡颂" in str(service_stats), "聚合结果应该包含卡卡颂统计"
             
         except Exception as e:
             pytest.fail(f"数据聚合时出错：{e}")
@@ -312,7 +312,7 @@ class TestUserBehaviorAgentDataManagement:
             "user_id": user_id,
             "phone_number": "13800138000",  # 敏感信息
             "real_name": "张三",  # 敏感信息
-            "service_type": "按摩",
+            "service_type": "血染钟楼",
             "timestamp": datetime.now() - timedelta(days=400)  # 过期数据
         }
         

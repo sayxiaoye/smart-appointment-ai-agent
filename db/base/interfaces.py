@@ -3,75 +3,87 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 
-class BaseTechnicianRepository(ABC):
-    """
-    技师数据访问抽象接口
-    
-    定义技师相关的所有数据操作方法
-    """
-    
+class BaseHostRepository(ABC):
+    """主持人数据访问抽象接口"""
+
     @abstractmethod
-    def add_technician(self, name: str, gender: Optional[str] = None, strength: Optional[str] = None) -> int:
-        """添加技师"""
+    def add_host(self, name: str, host_types: Optional[List[str]] = None, specialty: Optional[str] = None) -> int:
+        """添加主持人"""
         pass
 
     @abstractmethod
-    def get_technician_by_id(self, technician_id: int) -> Optional[Dict[str, Any]]:
-        """根据ID获取技师信息"""
+    def get_host_by_id(self, host_id: int) -> Optional[Dict[str, Any]]:
+        """根据ID获取主持人信息"""
         pass
 
     @abstractmethod
-    def get_technician_by_name(self, name: str) -> Optional[Dict[str, Any]]:
-        """根据姓名获取技师信息"""
+    def get_host_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """根据姓名获取主持人信息"""
         pass
 
     @abstractmethod
-    def get_all_technicians(self) -> List[Dict[str, Any]]:
-        """获取所有技师"""
+    def get_all_hosts(self) -> List[Dict[str, Any]]:
+        """获取所有主持人"""
         pass
 
     @abstractmethod
-    def get_all_strengths(self) -> List[str]:
-        """获取所有技师的专长"""
+    def get_all_specialties(self) -> List[str]:
+        """获取所有主持人的专长"""
         pass
 
     @abstractmethod
-    def update_technician(self, technician_id: int, **updates) -> bool:
-        """更新技师信息"""
+    def update_host(self, host_id: int, **updates) -> bool:
+        """更新主持人信息"""
         pass
 
     @abstractmethod
-    def delete_technician(self, technician_id: int) -> bool:
-        """删除技师"""
+    def delete_host(self, host_id: int) -> bool:
+        """删除主持人"""
         pass
 
     @abstractmethod
-    def get_technicians_by_gender(self, gender: str) -> List[Dict[str, Any]]:
-        """根据性别获取技师"""
+    def get_hosts_by_type(self, host_type: str) -> List[Dict[str, Any]]:
+        """根据主持类型获取主持人"""
+        pass
+
+
+class BaseGameRepository(ABC):
+    """桌游目录数据访问抽象接口"""
+
+    @abstractmethod
+    def add_game(self, name: str, min_players: int, max_players: int, duration_min: int,
+                 needs_host: bool, allowed_host_types: List[str]) -> int:
+        """添加游戏"""
+        pass
+
+    @abstractmethod
+    def get_all_games(self) -> List[Dict[str, Any]]:
+        """获取全部游戏"""
+        pass
+
+    @abstractmethod
+    def get_game_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """按名称获取游戏"""
         pass
 
 
 class BaseScheduleRepository(ABC):
-    """
-    排班数据访问抽象接口
-    
-    定义排班相关的所有数据操作方法
-    """
-    
+    """主持人排班数据访问抽象接口"""
+
     @abstractmethod
-    def add_schedule(self, technician_id: int, start_time: datetime, end_time: datetime, 
+    def add_schedule(self, host_id: int, start_time: datetime, end_time: datetime,
                     status: str, appointment_id: Optional[int] = None) -> int:
         """添加排班"""
         pass
 
     @abstractmethod
-    def get_technician_schedules(self, technician_id: int, date: datetime) -> List[Dict[str, Any]]:
-        """获取技师指定日期的排班"""
+    def get_host_schedules(self, host_id: int, date: datetime) -> List[Dict[str, Any]]:
+        """获取主持人指定日期的排班"""
         pass
 
     @abstractmethod
-    def is_technician_available(self, technician_id: int, start_time: datetime, end_time: datetime) -> bool:
-        """检查技师时间段是否可用"""
+    def is_host_available(self, host_id: int, start_time: datetime, end_time: datetime) -> bool:
+        """检查主持人时间段是否可用"""
         pass
 
     @abstractmethod
@@ -148,8 +160,8 @@ class BaseUserBehaviorRepository(ABC):
     """
     
     @abstractmethod
-    def record_behavior(self, user_id: str, action_type: str, action_data: Optional[Dict[str, Any]] = None, 
-                       technician_id: Optional[int] = None, session_id: Optional[str] = None) -> int:
+    def record_behavior(self, user_id: str, action_type: str, action_data: Optional[Dict[str, Any]] = None,
+                       host_id: Optional[int] = None, session_id: Optional[str] = None) -> int:
         """记录用户行为"""
         pass
 
@@ -170,8 +182,8 @@ class BaseUserBehaviorRepository(ABC):
         pass
 
     @abstractmethod
-    def create_recommendation(self, user_id: str, recommendation_type: str, content: str, 
-                            technician_id: Optional[int] = None) -> int:
+    def create_recommendation(self, user_id: str, recommendation_type: str, content: str,
+                            host_id: Optional[int] = None) -> int:
         """创建推荐"""
         pass
 

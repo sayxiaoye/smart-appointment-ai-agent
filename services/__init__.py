@@ -3,7 +3,8 @@
 
 包含：
 - 知识库服务
-- 技师服务  
+- 主持人服务
+- 游戏目录服务
 - 预约服务
 - 用户行为服务
 - 推荐调度服务
@@ -13,11 +14,12 @@
 from .text_embedding import (
     embed_input,
     find_best_match_indices,
-    save_technician_embeddings,
-    load_technician_embeddings
+    save_host_embeddings,
+    load_host_embeddings
 )
 from .knowledge_service import KnowledgeService
-from .technician_service import TechnicianService
+from .host_service import HostService
+from .game_catalog_service import GameCatalogService
 from .appointment_service import AppointmentService
 from .user_behavior_service import UserBehaviorService
 from .recommendation_service import RecommendationService
@@ -25,10 +27,11 @@ from .recommendation_service import RecommendationService
 __all__ = [
     'embed_input',
     'find_best_match_indices',
-    'save_technician_embeddings',
-    'load_technician_embeddings',
+    'save_host_embeddings',
+    'load_host_embeddings',
     'KnowledgeService',
-    'TechnicianService',
+    'HostService',
+    'GameCatalogService',
     'AppointmentService',
     'UserBehaviorService',
     'RecommendationService'

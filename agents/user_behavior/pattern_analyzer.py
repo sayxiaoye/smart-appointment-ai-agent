@@ -2,7 +2,7 @@
 简化版用户行为分析器
 
 核心功能：
-1. 分析用户最喜欢的技师
+1. 分析用户最常预约的主持人
 2. 分析用户常用的服务项目和时长
 3. 判断用户是否需要回访邀请
 4. 生成个性化回访消息
@@ -31,7 +31,7 @@ class PatternAnalyzer:
             return None
     
     def analyze_user_preferences(self, user_id: str = "default_user") -> Optional[Dict[str, Any]]:
-        """分析用户偏好：最喜欢的技师、常用服务、常用时长"""
+        """分析用户偏好：最常预约的主持人、常用游戏、常用时长"""
         try:
             # 获取用户所有预约历史
             if self.behavior_service:
@@ -49,37 +49,32 @@ class PatternAnalyzer:
             if not appointments:
                 return None
             
-            # 统计技师偏好
-            technician_counts = {}
-            service_counts = {}
+            host_counts = {}
+            game_counts = {}
             duration_counts = {}
-            
+
             for appointment in appointments:
-                data = appointment.get('action_data', {})
-                
-                # 统计技师 - 技师ID存储在单独字段中
-                tech_id = appointment.get('technician_id')  # 从记录本身获取
-                if tech_id:
-                    technician_counts[tech_id] = technician_counts.get(tech_id, 0) + 1
-                
-                # 统计服务项目
-                service = data.get('project')
-                if service:
-                    service_counts[service] = service_counts.get(service, 0) + 1
-                
-                # 统计时长
-                duration = data.get('duration')
+                data = appointment.get("action_data") or {}
+
+                host_id = appointment.get("host_id")
+                if host_id:
+                    host_counts[host_id] = host_counts.get(host_id, 0) + 1
+
+                game = data.get("game") or data.get("project")
+                if game:
+                    game_counts[game] = game_counts.get(game, 0) + 1
+
+                duration = data.get("duration")
                 if duration:
                     duration_counts[duration] = duration_counts.get(duration, 0) + 1
-            
-            # 找出最偏爱的选项
-            favorite_technician = max(technician_counts, key=technician_counts.get) if technician_counts else None
-            favorite_service = max(service_counts, key=service_counts.get) if service_counts else None
+
+            favorite_host = max(host_counts, key=host_counts.get) if host_counts else None
+            favorite_game = max(game_counts, key=game_counts.get) if game_counts else None
             favorite_duration = max(duration_counts, key=duration_counts.get) if duration_counts else None
-            
+
             return {
-                'favorite_technician_id': favorite_technician,
-                'favorite_service': favorite_service,
+                "favorite_host_id": favorite_host,
+                "favorite_service": favorite_game,
                 'favorite_duration': favorite_duration,
                 'total_appointments': len(appointments),
                 'last_appointment_date': appointments[0]['created_at'] if appointments else None
@@ -119,31 +114,27 @@ class PatternAnalyzer:
         try:
             preferences = self.analyze_user_preferences(user_id)
             if not preferences:
-                return "您好！好久没见了，要不要预约一个按摩放松一下？"
-            
-            # 获取技师信息
-            tech_id = preferences.get('favorite_technician_id')
-            service = preferences.get('favorite_service', '按摩')
-            duration = preferences.get('favorite_duration', 60)
-            
-            # 构建个性化消息
-            if tech_id:
-                from db import TechnicianDBRouter
-                db = TechnicianDBRouter()
-                tech_info = db.get_technician_by_id(tech_id)
-                tech_name = tech_info.get('name', '您偏爱的技师') if tech_info else '您偏爱的技师'
-                
-                message = f"您好！{tech_name}最近有空档，您之前很喜欢他/她的{service}服务。"
+                return "您好！好久没见了，要不要再约一局桌游？"
+
+            host_id = preferences.get("favorite_host_id")
+            game = preferences.get("favorite_service", "桌游")
+            duration = preferences.get("favorite_duration", 60)
+
+            if host_id:
+                from db import HostDBRouter
+                db = HostDBRouter()
+                host_info = db.get_host_by_id(host_id)
+                host_name = host_info.get("name", "您常约的主持人") if host_info else "您常约的主持人"
+                message = f"您好！{host_name}最近有空档，您之前常玩《{game}》。"
                 if duration:
-                    message += f"按照您习惯的{duration}分钟，"
-                message += "要不要预约一下放松一下？"
+                    message += f"按您习惯的{duration}分钟，"
+                message += "要不要再约一局？"
             else:
-                message = f"您好！好久没见了，要不要预约一个{service}服务放松一下？"
+                message = f"您好！好久没见了，要不要再约一局《{game}》？"
                 if duration:
                     message += f"按您习惯的{duration}分钟怎么样？"
-            
             return message
-            
+
         except Exception as e:
             self.logger.error(f"生成回访消息失败: {str(e)}")
-            return "您好！好久没见了，要不要预约一个按摩放松一下？"
+            return "您好！好久没见了，要不要再约一局桌游？"

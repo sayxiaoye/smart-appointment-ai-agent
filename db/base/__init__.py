@@ -8,11 +8,17 @@ Database Base Module
 """
 
 from .session_manager import SessionManager
-from .interfaces import BaseTechnicianRepository, BaseKnowledgeRepository, BaseUserBehaviorRepository
+from .interfaces import (
+    BaseHostRepository,
+    BaseGameRepository,
+    BaseKnowledgeRepository,
+    BaseUserBehaviorRepository,
+)
 
 __all__ = [
     'SessionManager',
-    'BaseTechnicianRepository',
-    'BaseKnowledgeRepository', 
+    'BaseHostRepository',
+    'BaseGameRepository',
+    'BaseKnowledgeRepository',
     'BaseUserBehaviorRepository'
 ]

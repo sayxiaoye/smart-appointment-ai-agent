@@ -3,7 +3,7 @@
 
 职责：
 1. 记录用户的操作行为（预约、咨询、取消等）
-2. 存储行为的上下文信息（时间、技师、服务等）
+2. 存储行为的上下文信息（时间、主持人、游戏等）
 3. 维护行为数据的完整性和一致性
 4. 提供行为数据的查询接口
 """
@@ -36,15 +36,15 @@ class BehaviorRecorder:
             # 如果没有service，返回None（应该在组件初始化时提供适当的处理）
             return None
     
-    def record_behavior(self, action_type: str, action_data: Dict[str, Any] = None, 
-                       technician_id: int = None, session_id: str = None) -> Optional[int]:
+    def record_behavior(self, action_type: str, action_data: Dict[str, Any] = None,
+                       host_id: int = None, session_id: str = None) -> Optional[int]:
         """
         记录用户行为
         
         Args:
             action_type: 行为类型 (appointment, consultation, cancel等)
             action_data: 行为相关数据
-            technician_id: 技师ID
+            host_id: 主持人ID
             session_id: 会话ID
             
         Returns:
@@ -57,7 +57,7 @@ class BehaviorRecorder:
                     user_id="default_user",  # 默认用户ID
                     action_type=action_type,
                     action_data=action_data,
-                    technician_id=str(technician_id) if technician_id else None,
+                    host_id=str(host_id) if host_id else None,
                     session_id=session_id or "default_session"
                 )
                 return 1 if success else None
@@ -67,7 +67,7 @@ class BehaviorRecorder:
                     user_id="default_user",  # 默认用户ID
                     action_type=action_type,
                     action_data=action_data,
-                    technician_id=technician_id,
+                    host_id=host_id,
                     session_id=session_id
                 )
                 return behavior_id
@@ -76,14 +76,14 @@ class BehaviorRecorder:
             self.logger.error(f"记录用户行为失败: {str(e)}")
             return None
     
-    def record_appointment_behavior(self, appointment_data: Dict[str, Any], 
-                                  technician_id: int = None, session_id: str = None) -> Optional[int]:
+    def record_appointment_behavior(self, appointment_data: Dict[str, Any],
+                                  host_id: int = None, session_id: str = None) -> Optional[int]:
         """
         记录预约行为的便捷方法
         
         Args:
             appointment_data: 预约相关数据
-            technician_id: 技师ID  
+            host_id: 主持人ID
             session_id: 会话ID
             
         Returns:
@@ -92,7 +92,7 @@ class BehaviorRecorder:
         return self.record_behavior(
             action_type='appointment',
             action_data=appointment_data,
-            technician_id=technician_id,
+            host_id=host_id,
             session_id=session_id
         )
     

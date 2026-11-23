@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from ..models import Base
+from .legacy_reset import reset_legacy_sqlite_if_needed
 
 
 class SessionManager:
@@ -21,6 +22,7 @@ class SessionManager:
         Args:
             db_path: 数据库连接路径
         """
+        reset_legacy_sqlite_if_needed(db_path)
         self.engine = create_engine(db_path)
         Base.metadata.create_all(self.engine)
         self.Session = scoped_session(sessionmaker(bind=self.engine))

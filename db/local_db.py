@@ -5,7 +5,7 @@
 建议逐步迁移到新的 DatabaseRouter 和 Repository 模式。
 """
 
-from .repositories import UserBehaviorRepository, TechnicianRepository
+from .repositories import UserBehaviorRepository, HostRepository
 from .base import SessionManager
 from typing import Dict, List, Any, Optional
 import warnings
@@ -28,10 +28,10 @@ class LocalUserBehaviorDB:
         self.repo = UserBehaviorRepository(self.session_manager)
 
     def record_user_behavior(self, action_type: str, action_data: Optional[Dict[str, Any]] = None, 
-                            technician_id: Optional[int] = None, session_id: Optional[str] = None, 
+                            host_id: Optional[int] = None, session_id: Optional[str] = None,
                             user_id: str = 'default_user'):
         """兼容性方法：记录用户行为"""
-        return self.repo.record_behavior(user_id, action_type, action_data, technician_id, session_id)
+        return self.repo.record_behavior(user_id, action_type, action_data, host_id, session_id)
 
     def get_user_behaviors(self, user_id: str = 'default_user', action_type: Optional[str] = None, 
                           days_back: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -47,9 +47,9 @@ class LocalUserBehaviorDB:
         return self.repo.get_user_preferences(user_id, preference_type)
 
     def create_recommendation(self, recommendation_type: str, content: str, 
-                            technician_id: Optional[int] = None, user_id: str = 'default_user'):
+                            host_id: Optional[int] = None, user_id: str = 'default_user'):
         """兼容性方法：创建推荐"""
-        return self.repo.create_recommendation(user_id, recommendation_type, content, technician_id)
+        return self.repo.create_recommendation(user_id, recommendation_type, content, host_id)
 
     def get_pending_recommendations(self, user_id: str = 'default_user') -> List[Dict[str, Any]]:
         """兼容性方法：获取待发送的推荐"""
@@ -64,57 +64,44 @@ class LocalUserBehaviorDB:
         return self.repo.get_user_statistics(user_id, days_back)
 
 
-class LocalTechnicianDB:
-    """
-    技师数据库的兼容性类
-    
-    将旧接口重定向到新的TechnicianRepository
-    """
-    
+class LocalHostDB:
+    """主持人数据库的兼容性类，转发到 HostRepository。"""
+
     def __init__(self, db_path='sqlite:///data/smart_appointment.db'):
         warnings.warn(
-            "LocalTechnicianDB已弃用，请使用 DatabaseRouter().technicians 或 TechnicianRepository",
+            "LocalHostDB已弃用，请使用 DatabaseRouter().hosts 或 HostRepository",
             DeprecationWarning,
             stacklevel=2
         )
         self.session_manager = SessionManager(db_path)
-        self.repo = TechnicianRepository(self.session_manager)
+        self.repo = HostRepository(self.session_manager)
 
-    def get_technician_by_name(self, session, name: str):
-        """兼容性方法：根据姓名获取技师信息"""
-        return self.repo.get_technician_by_name(name)
+    def get_host_by_name(self, session, name: str):
+        return self.repo.get_host_by_name(name)
 
-    def get_all_technicians(self, session):
-        """兼容性方法：获取所有技师"""
-        return self.repo.get_all_technicians()
+    def get_all_hosts(self, session):
+        return self.repo.get_all_hosts()
 
-    def get_all_strengths(self, session):
-        """兼容性方法：获取所有技师专长"""
-        return self.repo.get_all_strengths()
+    def get_all_specialties(self, session):
+        return self.repo.get_all_specialties()
 
-    def add_technician(self, session, name: str, gender: Optional[str] = None, strength: Optional[str] = None):
-        """兼容性方法：添加技师"""
-        return self.repo.add_technician(name, gender, strength)
+    def add_host(self, session, name: str, host_types: Optional[list] = None, specialty: Optional[str] = None):
+        return self.repo.add_host(name, host_types, specialty)
 
-    def add_schedule(self, session, technician_id: int, start_time, end_time, status: str, appointment_id: Optional[int] = None):
-        """兼容性方法：添加排班"""
-        return self.repo.add_schedule(technician_id, start_time, end_time, status, appointment_id)
+    def add_schedule(self, session, host_id: int, start_time, end_time, status: str, appointment_id: Optional[int] = None):
+        return self.repo.add_schedule(host_id, start_time, end_time, status, appointment_id)
 
-    def get_technician_schedules(self, session, technician_id: int, date):
-        """兼容性方法：获取技师排班"""
-        return self.repo.get_technician_schedules(technician_id, date)
+    def get_host_schedules(self, session, host_id: int, date):
+        return self.repo.get_host_schedules(host_id, date)
 
-    def is_technician_available(self, session, technician_id: int, start_time, end_time) -> bool:
-        """兼容性方法：检查技师是否可用"""
-        return self.repo.is_technician_available(technician_id, start_time, end_time)
+    def is_host_available(self, session, host_id: int, start_time, end_time) -> bool:
+        return self.repo.is_host_available(host_id, start_time, end_time)
 
-    def get_technicians_by_gender(self, session, gender: str):
-        """兼容性方法：根据性别获取技师"""
-        return self.repo.get_technicians_by_gender(gender)
+    def get_hosts_by_type(self, session, host_type: str):
+        return self.repo.get_hosts_by_type(host_type)
 
 
-# 为了完全兼容，也提供从原始base_db模块导入的接口
-class BaseTechnicianDB:
+class BaseHostDB:
     """兼容性基类"""
     pass
 

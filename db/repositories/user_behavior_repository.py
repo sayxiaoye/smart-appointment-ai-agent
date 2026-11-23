@@ -2,7 +2,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from ..base.interfaces import BaseUserBehaviorRepository
 from ..base.session_manager import SessionManager
-from ..models import UserBehavior, UserPreference, UserRecommendation, Technician
+from ..models import UserBehavior, UserPreference, UserRecommendation, Host
 
 
 class UserBehaviorRepository(BaseUserBehaviorRepository):
@@ -26,7 +26,7 @@ class UserBehaviorRepository(BaseUserBehaviorRepository):
         self.session_manager = session_manager
 
     def record_behavior(self, user_id: str, action_type: str, action_data: Optional[Dict[str, Any]] = None, 
-                       technician_id: Optional[int] = None, session_id: Optional[str] = None) -> int:
+                       host_id: Optional[int] = None, session_id: Optional[str] = None) -> int:
         """
         记录用户行为
         
@@ -34,7 +34,7 @@ class UserBehaviorRepository(BaseUserBehaviorRepository):
             user_id: 用户ID
             action_type: 行为类型
             action_data: 行为数据
-            technician_id: 技师ID
+            host_id: 主持人ID
             session_id: 会话ID
             
         Returns:
@@ -45,7 +45,7 @@ class UserBehaviorRepository(BaseUserBehaviorRepository):
                 user_id=user_id,
                 action_type=action_type,
                 action_data=action_data,
-                technician_id=technician_id,
+                host_id=self._coerce_host_id(host_id),
                 session_id=session_id
             )
             session.add(behavior)
@@ -175,7 +175,7 @@ class UserBehaviorRepository(BaseUserBehaviorRepository):
             return [self._preference_to_dict(preference) for preference in preferences]
 
     def create_recommendation(self, user_id: str, recommendation_type: str, content: str, 
-                            technician_id: Optional[int] = None) -> int:
+                            host_id: Optional[int] = None) -> int:
         """
         创建推荐
         
@@ -183,7 +183,7 @@ class UserBehaviorRepository(BaseUserBehaviorRepository):
             user_id: 用户ID
             recommendation_type: 推荐类型
             content: 推荐内容
-            technician_id: 相关技师ID
+            host_id: 相关主持人ID
             
         Returns:
             新创建的推荐ID
@@ -193,7 +193,7 @@ class UserBehaviorRepository(BaseUserBehaviorRepository):
                 user_id=user_id,
                 recommendation_type=recommendation_type,
                 content=content,
-                technician_id=technician_id
+                host_id=host_id
             )
             session.add(recommendation)
             session.flush()
@@ -272,18 +272,18 @@ class UserBehaviorRepository(BaseUserBehaviorRepository):
                 UserBehavior.created_at >= cutoff_date
             ).count()
             
-            # 最喜欢的技师
+            # 最常预约的主持人
             from sqlalchemy import func
-            favorite_technician = session.query(
-                UserBehavior.technician_id,
-                Technician.name,
-                func.count(UserBehavior.technician_id).label('count')
-            ).join(Technician).filter(
+            favorite_host = session.query(
+                UserBehavior.host_id,
+                Host.name,
+                func.count(UserBehavior.host_id).label('count')
+            ).join(Host).filter(
                 UserBehavior.user_id == user_id,
                 UserBehavior.action_type == 'appointment',
                 UserBehavior.created_at >= cutoff_date
-            ).group_by(UserBehavior.technician_id, Technician.name).order_by(
-                func.count(UserBehavior.technician_id).desc()
+            ).group_by(UserBehavior.host_id, Host.name).order_by(
+                func.count(UserBehavior.host_id).desc()
             ).first()
             
             # 最后一次访问
@@ -296,50 +296,50 @@ class UserBehaviorRepository(BaseUserBehaviorRepository):
                 'total_behaviors': total_behaviors,
                 'appointment_count': appointment_count,
                 'consultation_count': consultation_count,
-                'favorite_technician_id': favorite_technician[0] if favorite_technician else None,
-                'favorite_technician_name': favorite_technician[1] if favorite_technician else None,
-                'favorite_technician_visits': favorite_technician[2] if favorite_technician else 0,
+                'favorite_host_id': favorite_host[0] if favorite_host else None,
+                'favorite_host_name': favorite_host[1] if favorite_host else None,
+                'favorite_host_visits': favorite_host[2] if favorite_host else 0,
                 'last_visit_date': last_visit.created_at if last_visit else None,
                 'days_since_last_visit': (datetime.utcnow() - last_visit.created_at).days if last_visit else None,
                 'period_days': days_back
             }
 
-    def get_technician_popularity(self, days_back: int = 30) -> List[Dict[str, Any]]:
-        """
-        获取技师受欢迎程度统计
-        
-        Args:
-            days_back: 统计天数
-            
-        Returns:
-            技师受欢迎程度列表
-        """
+    def get_host_popularity(self, days_back: int = 30) -> List[Dict[str, Any]]:
+        """获取主持人受欢迎程度统计"""
         with self.session_manager.session_scope() as session:
             cutoff_date = datetime.utcnow() - timedelta(days=days_back)
             
             from sqlalchemy import func
             
             popularity = session.query(
-                UserBehavior.technician_id,
-                Technician.name,
-                func.count(UserBehavior.technician_id).label('appointment_count'),
+                UserBehavior.host_id,
+                Host.name,
+                func.count(UserBehavior.host_id).label('appointment_count'),
                 func.count(func.distinct(UserBehavior.user_id)).label('unique_users')
-            ).join(Technician).filter(
+            ).join(Host).filter(
                 UserBehavior.action_type == 'appointment',
                 UserBehavior.created_at >= cutoff_date
-            ).group_by(UserBehavior.technician_id, Technician.name).order_by(
-                func.count(UserBehavior.technician_id).desc()
+            ).group_by(UserBehavior.host_id, Host.name).order_by(
+                func.count(UserBehavior.host_id).desc()
             ).all()
             
             return [
                 {
-                    'technician_id': p[0],
-                    'technician_name': p[1],
+                    'host_id': p[0],
+                    'host_name': p[1],
                     'appointment_count': p[2],
                     'unique_users': p[3]
                 }
                 for p in popularity
             ]
+
+    def _coerce_host_id(self, host_id: Optional[int]) -> Optional[int]:
+        if host_id in (None, "", "None"):
+            return None
+        try:
+            return int(host_id)
+        except (TypeError, ValueError):
+            return None
 
     def _behavior_to_dict(self, behavior: UserBehavior) -> Dict[str, Any]:
         """将行为对象转换为字典"""
@@ -348,8 +348,8 @@ class UserBehaviorRepository(BaseUserBehaviorRepository):
             'user_id': behavior.user_id,
             'action_type': behavior.action_type,
             'action_data': behavior.action_data,
-            'technician_id': behavior.technician_id,
-            'technician_name': behavior.technician.name if behavior.technician else None,
+            'host_id': behavior.host_id,
+            'host_name': behavior.host.name if behavior.host else None,
             'session_id': behavior.session_id,
             'created_at': behavior.created_at
         }
@@ -372,8 +372,8 @@ class UserBehaviorRepository(BaseUserBehaviorRepository):
             'user_id': recommendation.user_id,
             'recommendation_type': recommendation.recommendation_type,
             'content': recommendation.content,
-            'technician_id': recommendation.technician_id,
-            'technician_name': recommendation.technician.name if recommendation.technician else None,
+            'host_id': recommendation.host_id,
+            'host_name': recommendation.host.name if recommendation.host else None,
             'is_sent': bool(recommendation.is_sent),
             'created_at': recommendation.created_at,
             'sent_at': recommendation.sent_at

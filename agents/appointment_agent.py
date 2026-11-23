@@ -4,7 +4,7 @@ from langchain_core.chat_history import InMemoryChatMessageHistory
 from config.model_provider import create_chat_model
 from .appointment import (
     InputParser, 
-    TechnicianFinder, 
+    HostFinder, 
     AppointmentProcessor, 
     MessageBuilder, 
     AppointmentDatabase
@@ -34,13 +34,13 @@ class AppointmentAgent:
         
         # 初始化组件
         self.input_parser = InputParser(self.llm)
-        self.technician_finder = TechnicianFinder()
+        self.host_finder = HostFinder()
         self.message_builder = MessageBuilder()
         self.appointment_database = AppointmentDatabase()
         self.appointment_processor = AppointmentProcessor(
-            self.input_parser, 
-            self.technician_finder,
-            self.message_builder, 
+            self.input_parser,
+            self.host_finder,
+            self.message_builder,
             self.appointment_database,
             self.llm
         )
@@ -67,13 +67,15 @@ class AppointmentAgent:
     def reset(self):
         """重置预约历史和状态"""
         self.appointment_history = {
-            "gender": None,
+            "game": None,
+            "game_id": None,
+            "host_type": None,
+            "player_count": None,
             "start_time": None,
             "duration": None,
-            "project": None,
+            "duration_defaulted": False,
+            "host_name": None,
             "preference": None,
-            "technician": None,
-            "technician_name": None
         }
         self.finished = False
         self.chat_history.clear()
@@ -102,7 +104,7 @@ class AppointmentAgent:
             self.finished = self.appointment_processor.update_history_from_data(self.appointment_history, data)
             
             # 3. 处理与预约无关的请求
-            # 如果正在等待用户确认推荐技师，不要转交给归类机器人
+            # 如果正在等待用户确认推荐主持人，不要转交给归类机器人
             if data.get("unrelated", False) and not self.appointment_history.get('awaiting_confirmation'):
                 # 注意：这里不清空预约历史，保留用户已输入的信息
                 # 只设置状态为CLASSIFY，让系统转交给其他机器人处理

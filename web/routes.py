@@ -73,57 +73,48 @@ async def knowledge_page(request: Request):
             "error": str(e)
         })
 
-@router.get("/technician", response_class=HTMLResponse, summary="技师状态页面")
-async def technician_page(request: Request):
-    """技师状态页面"""
-    # 通过API层获取技师数据
+@router.get("/host", response_class=HTMLResponse, summary="主持人状态页面")
+async def host_page(request: Request):
+    """主持人状态页面"""
     try:
-        from api.technician import get_all_technicians
-        
-        # 调用API层函数获取数据
-        technicians = await get_all_technicians()
-        
-        return templates.TemplateResponse("technician.html", {
+        from api.host import get_all_hosts
+        hosts = await get_all_hosts()
+        return templates.TemplateResponse("host.html", {
             "request": request,
-            "technicians": technicians
+            "hosts": hosts
         })
     except Exception as e:
-        return templates.TemplateResponse("technician.html", {
+        return templates.TemplateResponse("host.html", {
             "request": request,
-            "technicians": [],
+            "hosts": [],
             "error": str(e)
         })
 
-@router.get("/technician_schedule", response_class=HTMLResponse, summary="技师排班页面")
-async def technician_schedule_page(request: Request):
-    """技师排班页面"""
+@router.get("/host_schedule", response_class=HTMLResponse, summary="主持人排班页面")
+async def host_schedule_page(request: Request):
+    """主持人排班页面"""
     try:
-        from api.technician import get_all_technicians_schedule_today
+        from api.host import get_all_hosts_schedule_today
         from config.time_config import time_config
-        
-        # 获取当前日期
+
         current_date = time_config.current_date_str()
-        
-        # 通过API层获取所有技师的排班数据
-        schedules_data = await get_all_technicians_schedule_today()
-        
-        # 构建排班数据格式 - 直接使用API返回的数据
-        schedule = []
-        for schedule_item in schedules_data:
-            schedule.append({
-                "id": schedule_item["technician_id"],
-                "name": schedule_item["technician_name"],
-                "busy_periods": schedule_item["busy_periods"]
-            })
-        
-        return templates.TemplateResponse("technician_schedule.html", {
+        schedules_data = await get_all_hosts_schedule_today()
+        schedule = [
+            {
+                "id": item["host_id"],
+                "name": item["host_name"],
+                "busy_periods": item["busy_periods"],
+            }
+            for item in schedules_data
+        ]
+        return templates.TemplateResponse("host_schedule.html", {
             "request": request,
             "schedule": schedule,
             "current_date": current_date
         })
     except Exception as e:
-        logger.error(f"加载技师排班数据失败: {str(e)}")
-        return templates.TemplateResponse("technician_schedule.html", {
+        logger.error(f"加载主持人排班数据失败: {str(e)}")
+        return templates.TemplateResponse("host_schedule.html", {
             "request": request,
             "schedule": [],
             "error": str(e)
@@ -140,34 +131,30 @@ async def admin_dashboard(request: Request):
     try:
         # 通过API层获取系统状态信息
         from api.knowledge import get_all_knowledge
-        from api.technician import get_all_technicians
-        
-        # 获取知识库数据
+        from api.host import get_all_hosts
+
         knowledge_data = await get_all_knowledge()
         knowledge_count = knowledge_data.get("total_count", 0)
         categories = knowledge_data.get("categories", [])
-        
-        # 获取技师数据
-        technicians = await get_all_technicians()
-        
-        # 数据库信息
+        hosts = await get_all_hosts()
+
         db_info = {
             "knowledge_count": knowledge_count,
             "categories_count": len(categories),
-            "technicians_count": len(technicians),
+            "hosts_count": len(hosts),
             "categories": categories
         }
-        
+
         return templates.TemplateResponse("admin_dashboard.html", {
             "request": request,
             "db_info": db_info,
-            "technicians": technicians[:5]  # 只显示前5个技师
+            "hosts": hosts[:5]
         })
     except Exception as e:
         return templates.TemplateResponse("admin_dashboard.html", {
             "request": request,
             "db_info": {},
-            "technicians": [],
+            "hosts": [],
             "error": str(e)
         })
 
@@ -177,18 +164,15 @@ async def database_admin_page(request: Request):
     try:
         # 通过API层获取数据库统计信息
         from api.knowledge import get_all_knowledge
-        from api.technician import get_all_technicians
-        
-        # 获取知识库数据
+        from api.host import get_all_hosts
+
         knowledge_data = await get_all_knowledge()
-        
-        # 获取技师数据
-        technicians = await get_all_technicians()
-        
+        hosts = await get_all_hosts()
+
         stats = {
             "knowledge_documents": knowledge_data.get("total_count", 0),
             "categories": len(knowledge_data.get("categories", [])),
-            "technicians": len(technicians),
+            "hosts": len(hosts),
             "appointments": 0  # TODO: 通过API获取预约数量
         }
         

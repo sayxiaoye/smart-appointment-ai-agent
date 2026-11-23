@@ -1,131 +1,126 @@
 """
 消息构建器
 
-负责构建各种响应消息
+负责构建桌游预约的响应消息
 """
 
 from typing import Dict, Any, List
+from config.constants import host_type_label, is_known
 
 
 class MessageBuilder:
     """消息构建器"""
-    
+
     def __init__(self):
         self.missing_info_prompts = {
-            "gender": "您希望选择男技师还是女技师呢？",
-            "start_time": "请问您想预约的时间是？",
-            "duration": "请问您需要多长时间的服务？",
-            "project": "请问您需要什么服务项目？比如按摩？",
-            "preference": "您对技师有力气大小等偏好吗？"
+            "start_time": "请问您想预约哪一天、几点开局？",
+            "duration": "请问预计玩多久？",
+            "game": "请问想玩哪款桌游？例如血染钟楼、卡卡颂、恐龙小镇。",
+            "player_count": "请问一共几位玩家？",
+            "host_type": "请问需要哪种主持？专业主持人、店员带玩、自助，或少儿向主持。",
+            "preference": "对主持人的风格有偏好吗？没有的话可以直接说没有。",
         }
-    
-    def create_appointment_success_message(self, tech: Dict[str, Any]) -> str:
-        """创建预约成功消息"""
-        # 检查是否是推荐技师
-        if tech.get('is_recommendation'):
-            original_tech = tech.get('original_technician', {})
-            return (f"\n机器人：已为您预约技师：{tech['name']}，性别：{tech['gender']}。预约成功！"
-                    f"（原指定的{original_tech.get('name', '')}技师时间冲突，{tech['name']}在相同服务方面同样专业）"
-                    "今天下午北京最高温度39℃，出行请注意防晒，期待与您相遇\n")
-        else:
-            return (f"\n机器人：已为您预约技师：{tech['name']}，性别：{tech['gender']}。预约成功！"
-                    "今天下午北京最高温度39℃，出行请注意防晒，期待与您相遇\n")
 
-    def create_technician_recommendation_message(self, original_tech: Dict[str, Any], 
-                                               recommended_tech: Dict[str, Any], 
-                                               appointment_history: Dict[str, Any],
-                                               llm=None) -> str:
-        """创建技师推荐消息，使用LLM生成个性化措辞"""
-        project = appointment_history.get('project', '按摩服务')
-        start_time = appointment_history.get('start_time', '')
-        
+    def create_appointment_success_message(self, host: Dict[str, Any], appointment_history: Dict[str, Any]) -> str:
+        summary = self._booking_summary(appointment_history)
+        label = host_type_label(appointment_history.get("host_type"))
+        if host.get("is_recommendation"):
+            original = host.get("original_host") or {}
+            return (
+                f"\n机器人：{summary}主持人：{host['name']}（{label}）。预约成功！"
+                f"（原指定的{original.get('name', '')}时间冲突，{host['name']}同样擅长这类局。）\n"
+            )
+        return f"\n机器人：{summary}主持人：{host['name']}（{label}）。预约成功！\n"
+
+    def create_self_play_success_message(self, appointment_history: Dict[str, Any]) -> str:
+        summary = self._booking_summary(appointment_history)
+        return f"\n机器人：{summary}这场是自助，不安排主持人。预约成功！\n"
+
+    def create_host_recommendation_message(self, original_host: Dict[str, Any],
+                                           recommended_host: Dict[str, Any],
+                                           appointment_history: Dict[str, Any],
+                                           llm=None) -> str:
+        game = appointment_history.get("game", "桌游")
+        start_time = appointment_history.get("start_time", "")
+        label = host_type_label(appointment_history.get("host_type"))
+
         if llm:
             try:
-                # 构建LLM提示
                 prompt = f"""
-作为一个专业的预约助手，用户想预约{original_tech['name']}技师做{project}，但{original_tech['name']}技师在{start_time}这个时间段不空闲。
+你是桌游店预约助手。用户想约{original_host['name']}主持《{game}》，但{original_host['name']}在{start_time}没空。
 
-我找到了一位相似的技师：
-- 姓名：{recommended_tech['name']}
-- 性别：{recommended_tech['gender']}  
-- 专长：{recommended_tech.get('strength', '')}
+可改约的主持人：
+- 姓名：{recommended_host['name']}
+- 主持类型：{label}
+- 专长：{recommended_host.get('specialty', '')}
 
-原技师专长：{original_tech.get('strength', '')}
+原主持人专长：{original_host.get('specialty', '')}
 
-请帮我生成一段温馨、专业的推荐话术，告诉用户原技师没空，但推荐技师在相同项目上同样专业，这个时间段有空，询问用户是否愿意预约推荐技师。
-
-要求：
-1. 语气温和、专业
-2. 突出推荐技师的专业性
-3. 明确询问用户意愿
-4. 字数控制在80字以内
+请生成一段80字以内的推荐，说明原主持人没空，推荐这位同类型主持人，并询问是否改约。只输出给用户看的话。
 """
-                
                 response = llm.invoke(prompt)
-                if hasattr(response, 'content'):
-                    generated_msg = response.content.strip()
-                    if generated_msg:
-                        return f"\n机器人：{generated_msg}\n"
-                
-            except Exception as e:
-                print(f"LLM生成推荐消息失败: {e}")
-        
-        # 如果LLM失败，使用默认消息
-        return (f"\n机器人：抱歉，{original_tech['name']}技师在{start_time}这个时间段不空闲。"
-                f"不过{recommended_tech['name']}技师（{recommended_tech['gender']}）在{project}方面同样专业，"
-                f"这个时间段有空，请问您愿意让我帮您预约{recommended_tech['name']}技师吗？\n")
+                generated = response.content.strip() if hasattr(response, "content") else ""
+                if generated:
+                    return f"\n机器人：{generated}\n"
+            except Exception as exc:
+                print(f"LLM生成推荐消息失败: {exc}")
+
+        return (
+            f"\n机器人：抱歉，{original_host['name']}在{start_time}没空。"
+            f"{recommended_host['name']}也能做{label or '这类'}主持，这个时段有空。"
+            f"要改约{recommended_host['name']}吗？\n"
+        )
 
     def create_recommendation_declined_message(self, llm=None) -> str:
-        """创建用户拒绝推荐时的消息"""
         if llm:
             try:
-                prompt = """
-用户拒绝了我推荐的技师，请帮我生成一段专业、温馨的回复，表达理解并提供其他选择建议。
-
-要求：
-1. 表达理解用户的选择
-2. 提供其他解决方案（如换时间、重新选择等）
-3. 保持专业和友好的语气
-4. 字数控制在60字以内
-"""
+                prompt = "用户拒绝了推荐的桌游主持人。用60字以内表示理解，并建议换时间或重新选主持类型。只输出给用户看的话。"
                 response = llm.invoke(prompt)
-                if hasattr(response, 'content'):
-                    generated_msg = response.content.strip()
-                    if generated_msg:
-                        return f"\n机器人：{generated_msg}\n"
-            except Exception as e:
-                print(f"LLM生成拒绝消息失败: {e}")
-        
-        # 默认消息
-        return "\n机器人：好的，我理解您的选择。您可以选择其他时间段，或者我可以为您重新推荐其他技师。请问您还有其他需要吗？\n"
-    
-    def create_appointment_failure_message(self, technician_name: str) -> str:
-        """创建预约失败消息"""
-        if technician_name and technician_name != "未知":
-            # 通过Services层访问数据库
+                generated = response.content.strip() if hasattr(response, "content") else ""
+                if generated:
+                    return f"\n机器人：{generated}\n"
+            except Exception as exc:
+                print(f"LLM生成拒绝消息失败: {exc}")
+        return "\n机器人：好的。您可以换一个时间，或告诉我其他主持类型，我再帮您看档期。\n"
+
+    def create_appointment_failure_message(self, host_name: str) -> str:
+        if is_known(host_name):
             from services.appointment_service import AppointmentService
-            appointment_service = AppointmentService()
-            specific_tech = appointment_service.get_technician_by_name(technician_name)
-            if specific_tech:
-                return f"\n机器人：抱歉，{technician_name}技师在您选择的时间段不空闲。请选择其他时间，或者我可以为您推荐其他技师。\n"
-            else:
-                return f"\n机器人：抱歉，没有找到名为'{technician_name}'的技师。请确认技师姓名，或者我可以为您推荐其他技师。\n"
-        else:
-            return "\n机器人：抱歉，该时间段没有合适的技师空闲，请选择其他时间或调整偏好。\n"
-    
-    def create_missing_info_questions(self, missing_info: List[str]) -> str:
-        """根据缺失信息创建询问"""
-        questions = [self.missing_info_prompts.get(field, f"请补充{field}信息") for field in missing_info]
-        return "\n" + " ".join(questions) + "\n"
-    
+            host = AppointmentService().get_host_by_name(host_name)
+            if host:
+                return f"\n机器人：抱歉，{host_name}在这个时段没空，也没有同类型的主持人能顶上。请换个时间，或改主持类型。\n"
+            return f"\n机器人：抱歉，没有找到名为「{host_name}」的主持人。请确认姓名，或改由我们按类型安排。\n"
+        return "\n机器人：抱歉，这个时段没有合适的主持人空闲。请换个时间，或改成自助（如果这款游戏允许）。\n"
+
+    def create_missing_info_questions(self, missing_info: List[str], appointment_history: Dict[str, Any] = None) -> str:
+        questions = [self.missing_info_prompts.get(field, f"请补充{field}") for field in missing_info]
+        prefix = ""
+        history = appointment_history or {}
+        if history.get("duration_defaulted") and "duration" not in missing_info and history.get("game"):
+            prefix = f"时长先按《{history['game']}》的建议 {history.get('duration')} 安排。"
+        return "\n" + prefix + " ".join(questions) + "\n"
+
+    def create_clarify_message(self, question: str, appointment_history: Dict[str, Any] = None) -> str:
+        history = appointment_history or {}
+        prefix = ""
+        if history.get("duration_defaulted") and history.get("game"):
+            prefix = f"时长先按《{history['game']}》的建议 {history.get('duration')} 安排。"
+        return "\n" + prefix + question + "\n"
+
     def create_unrelated_message(self) -> str:
-        """创建无关请求的消息"""
-        return "[REPLY][预约机器人]抱歉，我无法处理这个问题。我只能帮您处理推拿服务相关的预约。请问您需要预约服务吗？\n"
-    
+        return "[REPLY][预约机器人]抱歉，我只能处理桌游预约。您可以告诉我想玩的游戏、人数、时间和主持方式。\n"
+
     def create_parse_error_message(self) -> str:
-        """创建解析错误消息"""
         return "[REPLY][预约机器人]\n机器人：解析失败，请重试。\n"
-    
+
     def create_save_failure_message(self) -> str:
-        """创建保存失败消息"""
         return "\n机器人：抱歉，预约保存失败，请重试。\n"
+
+    def _booking_summary(self, appointment_history: Dict[str, Any]) -> str:
+        game = appointment_history.get("game") or "桌游"
+        players = appointment_history.get("player_count")
+        start_time = appointment_history.get("start_time") or ""
+        duration = appointment_history.get("duration") or ""
+        duration_note = "（已按建议时长安排）" if appointment_history.get("duration_defaulted") else ""
+        player_text = f"{players}人，" if players else ""
+        return f"已为您预约《{game}》，{player_text}{start_time}，时长{duration}{duration_note}。"

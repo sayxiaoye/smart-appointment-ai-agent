@@ -2,13 +2,14 @@
 FastAPI应用程序
 
 主应用程序入口，配置中间件、路由和异常处理
-自动初始化知识库和技师数据
+自动初始化知识库、游戏目录和主持人数据
 """
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from services.knowledge_service import KnowledgeService
-from services.technician_service import TechnicianService
+from services.host_service import HostService
+from services.game_catalog_service import GameCatalogService
 from services.recommendation_service import RecommendationService
 from typing import List, Optional
 import logging
@@ -46,10 +47,11 @@ async def initialize_system():
         knowledge_service = KnowledgeService()
         await knowledge_service.initialize()
         
-        # 初始化技师服务
-        logger.info("👨‍⚕️ 初始化技师服务...")
-        technician_service = TechnicianService()
-        technician_service.initialize_default_technicians()
+        logger.info("初始化游戏目录...")
+        GameCatalogService().initialize_default_games()
+
+        logger.info("初始化主持人数据...")
+        HostService().initialize_default_hosts()
         
         # 初始化推荐服务
         logger.info("🎯 启动推荐调度服务...")

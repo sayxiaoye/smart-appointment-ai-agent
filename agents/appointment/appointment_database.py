@@ -35,56 +35,53 @@ class AppointmentDatabase:
             self._user_behavior_service = UserBehaviorService()
         return self._user_behavior_service
     
-    def save_appointment(self, technician_id: str, start_time: datetime, 
-                        end_time: datetime, appointment_history: Dict[str, Any], 
+    def save_appointment(self, host_id, start_time: datetime,
+                        end_time: datetime, appointment_history: Dict[str, Any],
                         session_id: str) -> bool:
         """保存预约信息到数据库"""
         try:
-            # 通过Services层保存预约
             success = self.appointment_service.save_appointment(
-                technician_id, start_time, end_time, appointment_history, session_id
+                host_id, start_time, end_time, appointment_history, session_id
             )
-            
             if success:
-                # 记录用户行为
-                self._record_user_behavior(start_time, end_time, technician_id, 
-                                         appointment_history, session_id)
-            
+                self._record_user_behavior(start_time, end_time, host_id, appointment_history, session_id)
             return success
-            
-        except Exception as e:
-            print(f"保存预约信息到数据库失败：{e}")
+        except Exception as exc:
+            print(f"保存预约信息到数据库失败：{exc}")
             return False
-    
-    def update_memory_schedule(self, technician_id: str, start_time: datetime, end_time: datetime):
-        """更新内存中的技师忙碌时间段"""
+
+    def update_memory_schedule(self, host_id, start_time: datetime, end_time: datetime):
+        """更新内存中的主持人忙碌时间段。自助场次不写入。"""
+        if host_id in (None, "", "None"):
+            return
         busy_period = {
             "start": time_config.format_datetime(start_time, "%H:%M"),
             "end": time_config.format_datetime(end_time, "%H:%M")
         }
-        busy_periods_dict.setdefault(technician_id, []).append(busy_period)
-    
+        busy_periods_dict.setdefault(host_id, []).append(busy_period)
+
     def _record_user_behavior(self, start_time: datetime, end_time: datetime,
-                            technician_id: str, appointment_history: Dict[str, Any], 
+                            host_id, appointment_history: Dict[str, Any],
                             session_id: str):
         """记录用户预约行为"""
         try:
+            stored_host_id = None if host_id in (None, "", "None") else int(host_id)
             action_data = {
-                'start_time': time_config.format_datetime(start_time, "%Y-%m-%d %H:%M:%S"),
-                'end_time': time_config.format_datetime(end_time, "%Y-%m-%d %H:%M:%S"),
-                'duration': int((end_time - start_time).total_seconds() / 60),
-                'project': appointment_history.get('project', 'massage'),
-                'preference': appointment_history.get('preference', ''),
-                'technician_id': technician_id
+                "start_time": time_config.format_datetime(start_time, "%Y-%m-%d %H:%M:%S"),
+                "end_time": time_config.format_datetime(end_time, "%Y-%m-%d %H:%M:%S"),
+                "duration": int((end_time - start_time).total_seconds() / 60),
+                "game": appointment_history.get("game"),
+                "host_type": appointment_history.get("host_type"),
+                "player_count": appointment_history.get("player_count"),
+                "preference": appointment_history.get("preference", ""),
+                "host_id": stored_host_id,
             }
-            
-            # 通过Services层记录用户行为
             self.user_behavior_service.record_behavior(
-                user_id="default_user",  # 统一使用default_user作为用户ID
-                action_type='appointment',
+                user_id="default_user",
+                action_type="appointment",
                 action_data=action_data,
-                technician_id=str(technician_id),
-                session_id=session_id
+                host_id=stored_host_id,
+                session_id=session_id,
             )
             
         except Exception as behavior_error:
