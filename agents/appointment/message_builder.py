@@ -132,8 +132,9 @@ class MessageBuilder:
                 bits.append(f"{history['player_count']}人")
             if is_known(history.get("start_time")):
                 bits.append(str(history["start_time"]))
-            if is_known(history.get("host_type")):
-                bits.append(host_type_label(history.get("host_type")))
+            host_text = self._host_text(history)
+            if host_text:
+                bits.append(host_text)
             parts.append("进行中的预约：" + "，".join(bits) + "。")
         if saved and (saved.get("game") or saved.get("start_time")):
             saved_bits = []
@@ -143,8 +144,9 @@ class MessageBuilder:
                 saved_bits.append(f"{saved['player_count']}人")
             if saved.get("start_time"):
                 saved_bits.append(str(saved["start_time"]))
-            if saved.get("host_type"):
-                saved_bits.append(host_type_label(saved.get("host_type")))
+            host_text = self._host_text(saved)
+            if host_text:
+                saved_bits.append(host_text)
             parts.append("最近一次已确认：" + "，".join(saved_bits) + "。")
         if not parts:
             return "\n机器人：当前没有进行中的预约，也没有已确认的场次。可以直接告诉我想玩的游戏、人数和时间。\n"
@@ -158,6 +160,36 @@ class MessageBuilder:
 
     def create_save_failure_message(self) -> str:
         return "\n机器人：抱歉，预约保存失败，请重试。\n"
+
+    def _host_text(self, record: Dict[str, Any]) -> str:
+        """把已匹配的主持人写成姓名；自助场次没有主持人。"""
+        host_type = record.get("host_type")
+        if host_type in ("self_play", "自助"):
+            return "自助"
+        name = self._lookup_host_name(record.get("host_id"))
+        if not is_known(name) and is_known(record.get("host_name")):
+            name = record.get("host_name")
+        label = host_type_label(host_type) if is_known(host_type) else ""
+        if is_known(name) and label:
+            return f"主持人：{name}（{label}）"
+        if is_known(name):
+            return f"主持人：{name}"
+        return label
+
+    def _lookup_host_name(self, host_id):
+        if host_id in (None, "", "未知", "无", "None"):
+            return None
+        try:
+            from services.host_service import HostService
+            host = HostService().get_host_by_id(int(host_id))
+        except (TypeError, ValueError):
+            return None
+        except Exception as exc:
+            print(f"查询主持人姓名失败: {exc}")
+            return None
+        if not host:
+            return None
+        return host.get("name")
 
     def _booking_summary(self, appointment_history: Dict[str, Any]) -> str:
         game = appointment_history.get("game") or "桌游"

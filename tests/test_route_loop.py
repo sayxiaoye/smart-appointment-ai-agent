@@ -157,3 +157,30 @@ def test_status_question_detection_ignores_new_booking():
     )
     assert "卡卡颂" in reply
     assert "自助" in reply
+    assert "主持人：" not in reply
+
+    named = MessageBuilder().create_status_message(
+        {},
+        {
+            "game": "血染钟楼",
+            "player_count": 7,
+            "start_time": "2026-11-24 13:00:00",
+            "host_type": "pro_host",
+            "host_name": "陈屿",
+        },
+    )
+    assert "主持人：陈屿（专业主持人）" in named
+
+    builder = MessageBuilder()
+    builder._lookup_host_name = lambda host_id: "陈屿" if host_id == 1 else None
+    looked_up = builder.create_status_message(
+        {},
+        {
+            "game": "血染钟楼",
+            "player_count": 7,
+            "start_time": "2026-11-24 13:00:00",
+            "host_type": "pro_host",
+            "host_id": 1,
+        },
+    )
+    assert "主持人：陈屿（专业主持人）" in looked_up

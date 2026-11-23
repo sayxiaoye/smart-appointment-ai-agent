@@ -75,6 +75,7 @@ class AppointmentDatabase:
                 "player_count": appointment_history.get("player_count"),
                 "preference": appointment_history.get("preference", ""),
                 "host_id": stored_host_id,
+                "host_name": self._booked_host_name(stored_host_id, appointment_history),
             }
             self.user_behavior_service.record_behavior(
                 user_id="default_user",
@@ -86,3 +87,14 @@ class AppointmentDatabase:
             
         except Exception as behavior_error:
             print(f"记录用户行为失败（但预约仍然成功）：{behavior_error}")
+
+    def _booked_host_name(self, host_id, appointment_history: Dict[str, Any]):
+        """记录实际订到的主持人，而不是用户随口说的称呼。"""
+        if host_id not in (None, "", "None"):
+            host = self.appointment_service.get_host_by_id(int(host_id))
+            if host and host.get("name"):
+                return host.get("name")
+        name = appointment_history.get("host_name")
+        if name in (None, "", "未知", "无"):
+            return None
+        return name

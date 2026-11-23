@@ -10,6 +10,7 @@ from .appointment import (
     AppointmentDatabase
 )
 from .appointment.message_builder import is_status_question
+from config.constants import is_known
 
 load_dotenv()
 
@@ -164,8 +165,12 @@ class AppointmentAgent:
         except Exception:
             return None
         for record in records or []:
-            data = record.get("action_data") or {}
+            data = dict(record.get("action_data") or {})
             if data.get("game") or data.get("start_time"):
+                if not data.get("host_id") and record.get("host_id"):
+                    data["host_id"] = record.get("host_id")
+                if not is_known(data.get("host_name")) and is_known(record.get("host_name")):
+                    data["host_name"] = record.get("host_name")
                 return data
         return None
 
