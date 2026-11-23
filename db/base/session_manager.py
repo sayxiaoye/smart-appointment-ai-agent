@@ -25,7 +25,22 @@ class SessionManager:
         reset_legacy_sqlite_if_needed(db_path)
         self.engine = create_engine(db_path)
         Base.metadata.create_all(self.engine)
+        self._ensure_host_gender_column()
         self.Session = scoped_session(sessionmaker(bind=self.engine))
+
+    def _ensure_host_gender_column(self):
+        """已有 SQLite 不会被 create_all 改表，缺性别列时补上一列。"""
+        if self.engine.dialect.name != "sqlite":
+            return
+        with self.engine.begin() as conn:
+            tables = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='hosts'"
+            ).fetchall()
+            if not tables:
+                return
+            columns = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(hosts)").fetchall()}
+            if "gender" not in columns:
+                conn.exec_driver_sql("ALTER TABLE hosts ADD COLUMN gender VARCHAR")
 
     @contextmanager
     def session_scope(self):

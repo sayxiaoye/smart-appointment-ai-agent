@@ -15,6 +15,7 @@ class HostResponse(BaseModel):
     """主持人信息响应"""
     id: int
     name: str
+    gender: str = ""
     host_types: List[str]
     host_type_labels: List[str]
     specialty: str
@@ -36,6 +37,7 @@ def _to_host_response(host: dict) -> HostResponse:
     return HostResponse(
         id=host["id"],
         name=host["name"],
+        gender=host.get("gender") or "",
         host_types=host_types,
         host_type_labels=[host_type_label(item) for item in host_types],
         specialty=host.get("specialty") or "",

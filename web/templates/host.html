@@ -109,7 +109,7 @@
         .table-container {
             background: white;
             border-radius: 15px;
-            overflow: hidden;
+            overflow-x: auto;
             box-shadow: 0 8px 25px rgba(0,0,0,0.1);
             margin-bottom: 30px;
         }
@@ -126,6 +126,7 @@
             text-align: center;
             font-weight: 600;
             font-size: 14px;
+            white-space: nowrap;
         }
         
         td { 
@@ -133,6 +134,22 @@
             text-align: center;
             border-bottom: 1px solid rgba(0,0,0,0.05);
             font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .col-id,
+        .col-name,
+        .col-gender,
+        .col-type,
+        .col-status {
+            width: 1%;
+        }
+
+        .col-specialty {
+            white-space: normal;
+            text-align: left;
+            line-height: 1.6;
+            word-break: break-word;
         }
         
         tbody tr {
@@ -146,10 +163,16 @@
         }
         
         .status-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
             padding: 6px 12px;
             border-radius: 20px;
             font-size: 12px;
             font-weight: 500;
+            white-space: nowrap;
+            vertical-align: middle;
         }
         
         .status-available {
@@ -163,10 +186,16 @@
         }
         
         .gender-badge {
-            padding: 4px 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 4px 10px;
             border-radius: 12px;
             font-size: 12px;
             font-weight: 500;
+            white-space: nowrap;
+            vertical-align: middle;
         }
         
         .gender-male {
@@ -241,7 +270,7 @@
                 <i class="fas fa-users"></i>
                 主持人状态
             </h2>
-            <p>查看主持人类型和专长</p>
+            <p>查看主持人性别、类型和专长</p>
         </div>
         
         <div class="content">
@@ -262,25 +291,32 @@
                 <table>
                     <thead>
                         <tr>
-                            <th><i class="fas fa-id-badge"></i> 主持人ID</th>
-                            <th><i class="fas fa-user"></i> 姓名</th>
-                            <th><i class="fas fa-tags"></i> 主持类型</th>
-                            <th><i class="fas fa-star"></i> 专长</th>
-                            <th><i class="fas fa-info-circle"></i> 状态</th>
+                            <th class="col-id"><i class="fas fa-id-badge"></i> 主持人ID</th>
+                            <th class="col-name"><i class="fas fa-user"></i> 姓名</th>
+                            <th class="col-gender"><i class="fas fa-venus-mars"></i> 性别</th>
+                            <th class="col-type"><i class="fas fa-tags"></i> 主持类型</th>
+                            <th class="col-specialty"><i class="fas fa-star"></i> 专长</th>
+                            <th class="col-status"><i class="fas fa-info-circle"></i> 状态</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for host in hosts %}
                         <tr>
-                            <td><strong>{{ host.id }}</strong></td>
-                            <td>{{ host.name }}</td>
-                            <td>{{ host.host_type_labels | join('、') }}</td>
-                            <td>{{ host.specialty or '未填写' }}</td>
-                            <td>
-                                <span class="status-badge status-available">
-                                    <i class="fas fa-check-circle"></i>
-                                    可预约
-                                </span>
+                            <td class="col-id"><strong>{{ host.id }}</strong></td>
+                            <td class="col-name">{{ host.name }}</td>
+                            <td class="col-gender">
+                                {% if host.gender == '女' %}
+                                <span class="gender-badge gender-female"><i class="fas fa-venus"></i>女</span>
+                                {% elif host.gender == '男' %}
+                                <span class="gender-badge gender-male"><i class="fas fa-mars"></i>男</span>
+                                {% else %}
+                                {{ host.gender or '未填写' }}
+                                {% endif %}
+                            </td>
+                            <td class="col-type">{{ host.host_type_labels | join('、') }}</td>
+                            <td class="col-specialty">{{ host.specialty or '未填写' }}</td>
+                            <td class="col-status">
+                                <span class="status-badge status-available"><i class="fas fa-check-circle"></i>可预约</span>
                             </td>
                         </tr>
                         {% endfor %}

@@ -11,9 +11,9 @@ class HostRepository(BaseHostRepository, BaseScheduleRepository):
     def __init__(self, session_manager: SessionManager):
         self.session_manager = session_manager
 
-    def add_host(self, name: str, host_types: Optional[List[str]] = None, specialty: Optional[str] = None) -> int:
+    def add_host(self, name: str, host_types: Optional[List[str]] = None, specialty: Optional[str] = None, gender: Optional[str] = None) -> int:
         with self.session_manager.session_scope() as session:
-            host = Host(name=name, host_types=host_types or [], specialty=specialty)
+            host = Host(name=name, host_types=host_types or [], specialty=specialty, gender=gender)
             session.add(host)
             session.flush()
             return host.id
@@ -117,6 +117,7 @@ class HostRepository(BaseHostRepository, BaseScheduleRepository):
         return {
             "id": host.id,
             "name": host.name,
+            "gender": host.gender or "",
             "host_types": list(host.host_types or []),
             "specialty": host.specialty or "",
         }

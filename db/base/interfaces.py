@@ -7,7 +7,7 @@ class BaseHostRepository(ABC):
     """主持人数据访问抽象接口"""
 
     @abstractmethod
-    def add_host(self, name: str, host_types: Optional[List[str]] = None, specialty: Optional[str] = None) -> int:
+    def add_host(self, name: str, host_types: Optional[List[str]] = None, specialty: Optional[str] = None, gender: Optional[str] = None) -> int:
         """添加主持人"""
         pass
 

@@ -60,8 +60,8 @@ class HostDBRouter:
         self.db_router = DatabaseRouter(**kwargs)
         self.host_repo = self.db_router.hosts
 
-    def add_host(self, name, host_types=None, specialty=None) -> int:
-        return self.host_repo.add_host(name, host_types, specialty)
+    def add_host(self, name, host_types=None, specialty=None, gender=None) -> int:
+        return self.host_repo.add_host(name, host_types, specialty, gender)
 
     def get_host_by_name(self, name: str):
         return self.host_repo.get_host_by_name(name)

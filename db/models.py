@@ -9,6 +9,7 @@ class Host(Base):
     __tablename__ = "hosts"
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, nullable=False)
+    gender = Column(String, nullable=True)
     host_types = Column(JSON, nullable=False)
     specialty = Column(String, nullable=True)
     schedules = relationship("HostSchedule", back_populates="host", cascade="all, delete-orphan")

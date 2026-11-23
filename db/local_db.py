@@ -85,8 +85,8 @@ class LocalHostDB:
     def get_all_specialties(self, session):
         return self.repo.get_all_specialties()
 
-    def add_host(self, session, name: str, host_types: Optional[list] = None, specialty: Optional[str] = None):
-        return self.repo.add_host(name, host_types, specialty)
+    def add_host(self, session, name: str, host_types: Optional[list] = None, specialty: Optional[str] = None, gender: Optional[str] = None):
+        return self.repo.add_host(name, host_types, specialty, gender)
 
     def add_schedule(self, session, host_id: int, start_time, end_time, status: str, appointment_id: Optional[int] = None):
         return self.repo.add_schedule(host_id, start_time, end_time, status, appointment_id)
