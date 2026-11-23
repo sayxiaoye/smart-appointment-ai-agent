@@ -91,14 +91,21 @@ async def host_page(request: Request):
         })
 
 @router.get("/host_schedule", response_class=HTMLResponse, summary="主持人排班页面")
-async def host_schedule_page(request: Request):
-    """主持人排班页面"""
-    try:
-        from api.host import get_all_hosts_schedule_today
-        from config.time_config import time_config
+async def host_schedule_page(request: Request, date: str | None = None):
+    """主持人排班页面。date 为 YYYY-MM-DD，缺省为北京时间今天。"""
+    from api.host import get_all_hosts_schedule, resolve_schedule_date
+    from config.time_config import time_config
 
-        current_date = time_config.current_date_str()
-        schedules_data = await get_all_hosts_schedule_today()
+    today_iso = time_config.now().strftime("%Y-%m-%d")
+    selected_date = today_iso
+    if date:
+        try:
+            selected_date = resolve_schedule_date(date).strftime("%Y-%m-%d")
+        except Exception:
+            selected_date = today_iso
+    selected_label = resolve_schedule_date(selected_date).strftime("%Y年%m月%d日")
+    try:
+        schedules_data = await get_all_hosts_schedule(selected_date)
         schedule = [
             {
                 "id": item["host_id"],
@@ -110,13 +117,18 @@ async def host_schedule_page(request: Request):
         return templates.TemplateResponse("host_schedule.html", {
             "request": request,
             "schedule": schedule,
-            "current_date": current_date
+            "current_date": selected_label,
+            "selected_date": selected_date,
+            "today_iso": today_iso,
         })
     except Exception as e:
         logger.error(f"加载主持人排班数据失败: {str(e)}")
         return templates.TemplateResponse("host_schedule.html", {
             "request": request,
             "schedule": [],
+            "current_date": selected_label,
+            "selected_date": selected_date,
+            "today_iso": today_iso,
             "error": str(e)
         })
 

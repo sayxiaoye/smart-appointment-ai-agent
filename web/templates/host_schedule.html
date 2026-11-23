@@ -75,10 +75,18 @@
         }
         
         .schedule-info {
+            display: flex;
+            align-items: center;
+            gap: 28px;
             background: linear-gradient(135deg, rgba(79, 172, 254, 0.1), rgba(0, 242, 254, 0.1));
             border-radius: 15px;
             padding: 20px;
             margin-bottom: 30px;
+        }
+
+        .schedule-info-text {
+            flex: 1;
+            min-width: 0;
             text-align: center;
         }
         
@@ -91,6 +99,99 @@
         .schedule-info p {
             color: #666;
             margin-bottom: 10px;
+        }
+
+        .schedule-info p:last-child {
+            margin-bottom: 0;
+        }
+
+        .calendar-card {
+            flex: 0 0 340px;
+            width: 340px;
+            margin: 0;
+            background: white;
+            border-radius: 15px;
+            padding: 16px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+
+        .calendar-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .calendar-nav strong {
+            color: #333;
+            font-size: 16px;
+        }
+
+        .calendar-nav button,
+        .today-btn {
+            border: none;
+            background: rgba(79, 172, 254, 0.12);
+            color: #2b8fd6;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .calendar-nav button {
+            width: 36px;
+            height: 36px;
+            font-size: 18px;
+        }
+
+        .today-btn {
+            display: block;
+            margin: 12px auto 0;
+            padding: 8px 16px;
+        }
+
+        .calendar-weekdays,
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 4px;
+        }
+
+        .calendar-weekdays span {
+            text-align: center;
+            color: #888;
+            font-size: 12px;
+            padding-bottom: 4px;
+        }
+
+        .day-btn {
+            border: none;
+            background: transparent;
+            border-radius: 10px;
+            height: 40px;
+            cursor: pointer;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .day-btn:hover {
+            background: rgba(79, 172, 254, 0.12);
+        }
+
+        .day-btn.is-outside {
+            color: #ccc;
+        }
+
+        .day-btn.is-today {
+            box-shadow: inset 0 0 0 1px #4facfe;
+        }
+
+        .day-btn.is-selected {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .day-btn:disabled {
+            cursor: default;
         }
         
         .time-legend {
@@ -262,6 +363,16 @@
             .header, .content {
                 padding: 20px;
             }
+
+            .schedule-info {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .calendar-card {
+                flex: none;
+                width: 100%;
+            }
             
             .time-legend {
                 padding: 0 20px;
@@ -293,15 +404,29 @@
                 <i class="fas fa-calendar-alt"></i>
                 主持人排班
             </h2>
-            <p>查看主持人今天的已预约时段</p>
+            <p>点击日期查看当天的已预约时段</p>
         </div>
         
         <div class="content">
             <div class="schedule-info">
-                <h3><i class="fas fa-clock"></i> 营业时间说明</h3>
-                <p>今日日期：{{ current_date }}（北京时间）</p>
-                <p>工作时间：12:00 - 22:00 （共10小时）</p>
-                <p>红色区域表示已预约时间段，空白区域为可预约时间</p>
+                <div class="calendar-card" id="calendar" aria-label="选择日期">
+                    <div class="calendar-nav">
+                        <button type="button" id="prev-month" aria-label="上个月">‹</button>
+                        <strong id="calendar-title"></strong>
+                        <button type="button" id="next-month" aria-label="下个月">›</button>
+                    </div>
+                    <div class="calendar-weekdays">
+                        <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+                    </div>
+                    <div class="calendar-grid" id="calendar-grid"></div>
+                    <button type="button" class="today-btn" id="today-btn">回到今天</button>
+                </div>
+                <div class="schedule-info-text">
+                    <h3><i class="fas fa-clock"></i> 营业时间说明</h3>
+                    <p id="view-date">查看日期：{{ current_date }}{% if selected_date == today_iso %}（今天）{% endif %}</p>
+                    <p>工作时间：12:00 - 22:00 （共10小时）</p>
+                    <p>红色区域表示已预约时间段，空白区域为可预约时间</p>
+                </div>
             </div>
             
             <div class="time-legend">
@@ -319,7 +444,7 @@
                 </div>
             </div>
             
-            <div class="timeline-container">
+            <div class="timeline-container" id="timeline-container">
                 {% if schedule and schedule|length > 0 %}
                     {% for tech in schedule %}
                     <div class="timeline-row">
@@ -371,5 +496,162 @@
             </div>
         </div>
     </div>
+    <script>
+    const config = { selectedDate: "{{ selected_date }}", today: "{{ today_iso }}" };
+    const viewDate = document.getElementById('view-date');
+    const timeline = document.getElementById('timeline-container');
+    const grid = document.getElementById('calendar-grid');
+    const title = document.getElementById('calendar-title');
+    let selected = config.selectedDate;
+    let view = new Date(selected + 'T00:00:00');
+
+    function pad(value) {
+        return String(value).padStart(2, '0');
+    }
+
+    function isoFromParts(year, month, day) {
+        return year + '-' + pad(month) + '-' + pad(day);
+    }
+
+    function labelFromIso(iso) {
+        const [year, month, day] = iso.split('-');
+        const suffix = iso === config.today ? '（今天）' : '';
+        return '查看日期：' + year + '年' + month + '月' + day + '日' + suffix;
+    }
+
+    function renderCalendar() {
+        const year = view.getFullYear();
+        const month = view.getMonth();
+        title.textContent = year + '年' + (month + 1) + '月';
+        const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const daysInPrev = new Date(year, month, 0).getDate();
+        grid.replaceChildren();
+        for (let index = 0; index < 42; index += 1) {
+            let day = index - firstWeekday + 1;
+            let cellYear = year;
+            let cellMonth = month + 1;
+            let outside = false;
+            if (day < 1) {
+                outside = true;
+                day = daysInPrev + day;
+                cellMonth -= 1;
+                if (cellMonth < 1) {
+                    cellMonth = 12;
+                    cellYear -= 1;
+                }
+            } else if (day > daysInMonth) {
+                outside = true;
+                day -= daysInMonth;
+                cellMonth += 1;
+                if (cellMonth > 12) {
+                    cellMonth = 1;
+                    cellYear += 1;
+                }
+            }
+            const iso = isoFromParts(cellYear, cellMonth, day);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'day-btn';
+            button.textContent = String(day);
+            button.dataset.date = iso;
+            if (outside) button.classList.add('is-outside');
+            if (iso === config.today) button.classList.add('is-today');
+            if (iso === selected) button.classList.add('is-selected');
+            button.addEventListener('click', function () {
+                selectDate(iso);
+            });
+            grid.appendChild(button);
+        }
+    }
+
+    function renderSchedule(hosts) {
+        timeline.replaceChildren();
+        if (!hosts.length) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.innerHTML = '<i class="fas fa-calendar-check"></i><h3>暂无排班信息</h3><p>当前没有主持人排班数据</p>';
+            timeline.appendChild(empty);
+            return;
+        }
+        hosts.forEach(function (host) {
+            const row = document.createElement('div');
+            row.className = 'timeline-row';
+            const info = document.createElement('div');
+            info.className = 'info';
+            const name = document.createElement('div');
+            name.className = 'tech-name';
+            name.textContent = host.name;
+            const id = document.createElement('div');
+            id.className = 'tech-id';
+            id.textContent = 'ID: ' + host.id;
+            info.appendChild(name);
+            info.appendChild(id);
+            const bar = document.createElement('div');
+            bar.className = 'timeline';
+            const markers = document.createElement('div');
+            markers.className = 'time-markers';
+            for (let hour = 0; hour <= 10; hour += 1) {
+                const marker = document.createElement('div');
+                marker.className = 'time-marker';
+                marker.style.left = (hour / 10) * 100 + '%';
+                markers.appendChild(marker);
+            }
+            bar.appendChild(markers);
+            (host.busy_periods || []).forEach(function (period) {
+                const start = period.start.split(':').map(Number);
+                const end = period.end.split(':').map(Number);
+                const startMinutes = start[0] * 60 + start[1];
+                const endMinutes = end[0] * 60 + end[1];
+                const left = ((startMinutes - 12 * 60) / (10 * 60)) * 100;
+                const width = ((endMinutes - startMinutes) / (10 * 60)) * 100;
+                const block = document.createElement('div');
+                block.className = 'busy-block';
+                block.style.left = left + '%';
+                block.style.width = width + '%';
+                block.title = '预约时间: ' + period.start + ' - ' + period.end;
+                block.textContent = period.start + '~' + period.end;
+                bar.appendChild(block);
+            });
+            row.appendChild(info);
+            row.appendChild(bar);
+            timeline.appendChild(row);
+        });
+    }
+
+    async function selectDate(iso) {
+        if (iso === selected && timeline.dataset.loaded === iso) return;
+        selected = iso;
+        view = new Date(iso + 'T00:00:00');
+        viewDate.textContent = labelFromIso(iso);
+        renderCalendar();
+        const response = await fetch('/api/hosts/schedules?date=' + encodeURIComponent(iso));
+        if (!response.ok) {
+            viewDate.textContent = labelFromIso(iso) + ' 加载失败';
+            return;
+        }
+        const data = await response.json();
+        renderSchedule(data.map(function (item) {
+            return { id: item.host_id, name: item.host_name, busy_periods: item.busy_periods };
+        }));
+        timeline.dataset.loaded = iso;
+        const url = new URL(window.location.href);
+        url.searchParams.set('date', iso);
+        history.replaceState(null, '', url);
+    }
+
+    document.getElementById('prev-month').addEventListener('click', function () {
+        view = new Date(view.getFullYear(), view.getMonth() - 1, 1);
+        renderCalendar();
+    });
+    document.getElementById('next-month').addEventListener('click', function () {
+        view = new Date(view.getFullYear(), view.getMonth() + 1, 1);
+        renderCalendar();
+    });
+    document.getElementById('today-btn').addEventListener('click', function () {
+        selectDate(config.today);
+    });
+    renderCalendar();
+    </script>
 </body>
 </html>

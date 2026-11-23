@@ -4,8 +4,8 @@
 提供主持人信息和排班查询接口
 """
 
-from fastapi import APIRouter, HTTPException
-from typing import List
+from fastapi import APIRouter, HTTPException, Query
+from typing import List, Optional
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/hosts", tags=["主持人管理"])
@@ -52,18 +52,28 @@ async def get_all_hosts():
         raise HTTPException(status_code=500, detail=f"获取主持人信息失败: {str(exc)}")
 
 
-@router.get("/schedules/today", summary="获取所有主持人今日排班")
-async def get_all_hosts_schedule_today():
+def resolve_schedule_date(date: Optional[str]):
+    """把 YYYY-MM-DD 转成北京时间当天零点。空值表示今天。"""
+    from config.time_config import time_config
+
+    if not date:
+        return time_config.today()
+    parsed = time_config.parse_datetime(date, "%Y-%m-%d")
+    if parsed is None:
+        raise HTTPException(status_code=400, detail="日期格式应为 YYYY-MM-DD")
+    return parsed
+
+
+async def get_all_hosts_schedule(date: Optional[str] = None):
     try:
         from services.host_service import HostService
-        from config.time_config import time_config
 
         host_service = HostService()
-        today = time_config.today()
+        day = resolve_schedule_date(date)
         schedules_data = []
         for host in host_service.get_all_hosts():
             busy_periods = []
-            for sched in host_service.get_host_schedules(host["id"], today):
+            for sched in host_service.get_host_schedules(host["id"], day):
                 if sched.get("status") == "busy":
                     busy_periods.append({
                         "start": sched["start_time"].strftime("%H:%M") if hasattr(sched["start_time"], "strftime") else str(sched["start_time"]),
@@ -73,11 +83,24 @@ async def get_all_hosts_schedule_today():
             schedules_data.append({
                 "host_id": host["id"],
                 "host_name": host["name"],
+                "date": day.strftime("%Y-%m-%d"),
                 "busy_periods": busy_periods,
             })
         return schedules_data
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"获取排班信息失败: {str(exc)}")
+
+
+@router.get("/schedules", summary="按日期获取所有主持人排班")
+async def get_hosts_schedule_by_date(date: Optional[str] = Query(None, description="YYYY-MM-DD，缺省为今天")):
+    return await get_all_hosts_schedule(date)
+
+
+@router.get("/schedules/today", summary="获取所有主持人今日排班")
+async def get_all_hosts_schedule_today():
+    return await get_all_hosts_schedule(None)
 
 
 @router.get("/{host_id}/schedule", response_model=List[ScheduleResponse], summary="获取主持人排班")
