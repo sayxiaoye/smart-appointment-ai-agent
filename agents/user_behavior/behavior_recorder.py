@@ -37,7 +37,7 @@ class BehaviorRecorder:
             return None
     
     def record_behavior(self, action_type: str, action_data: Dict[str, Any] = None,
-                       host_id: int = None, session_id: str = None) -> Optional[int]:
+                       host_id: int = None, session_id: str = None, user_id: str = None) -> Optional[int]:
         """
         记录用户行为
         
@@ -46,38 +46,40 @@ class BehaviorRecorder:
             action_data: 行为相关数据
             host_id: 主持人ID
             session_id: 会话ID
+            user_id: 当前登录用户 id
             
         Returns:
             int: 行为记录ID，失败时返回None
         """
+        if not user_id:
+            self.logger.error("缺少用户身份，拒绝记录行为")
+            return None
         try:
-            # 如果有behavior_service则使用它，否则降级到数据库直接访问
             if self.behavior_service:
                 success = self.behavior_service.record_behavior(
-                    user_id="default_user",  # 默认用户ID
+                    user_id=str(user_id),
                     action_type=action_type,
                     action_data=action_data,
                     host_id=str(host_id) if host_id else None,
                     session_id=session_id or "default_session"
                 )
                 return 1 if success else None
-            else:
-                # 向后兼容：直接使用数据库
-                behavior_id = self.behavior_db.record_behavior(
-                    user_id="default_user",  # 默认用户ID
-                    action_type=action_type,
-                    action_data=action_data,
-                    host_id=host_id,
-                    session_id=session_id
-                )
-                return behavior_id
+            behavior_id = self.behavior_db.record_behavior(
+                user_id=str(user_id),
+                action_type=action_type,
+                action_data=action_data,
+                host_id=host_id,
+                session_id=session_id
+            )
+            return behavior_id
             
         except Exception as e:
             self.logger.error(f"记录用户行为失败: {str(e)}")
             return None
     
     def record_appointment_behavior(self, appointment_data: Dict[str, Any],
-                                  host_id: int = None, session_id: str = None) -> Optional[int]:
+                                  host_id: int = None, session_id: str = None,
+                                  user_id: str = None) -> Optional[int]:
         """
         记录预约行为的便捷方法
         
@@ -93,11 +95,12 @@ class BehaviorRecorder:
             action_type='appointment',
             action_data=appointment_data,
             host_id=host_id,
-            session_id=session_id
+            session_id=session_id,
+            user_id=user_id,
         )
     
     def record_consultation_behavior(self, consultation_data: Dict[str, Any], 
-                                   session_id: str = None) -> Optional[int]:
+                                   session_id: str = None, user_id: str = None) -> Optional[int]:
         """
         记录咨询行为的便捷方法
         
@@ -111,7 +114,8 @@ class BehaviorRecorder:
         return self.record_behavior(
             action_type='consultation',
             action_data=consultation_data,
-            session_id=session_id
+            session_id=session_id,
+            user_id=user_id,
         )
     
     def get_user_behaviors(self, action_type: str = None, 

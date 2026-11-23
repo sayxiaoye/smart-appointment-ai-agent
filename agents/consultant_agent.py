@@ -18,9 +18,10 @@ class ConsultantAgent:
     3. 协调整个咨询流程
     """
     
-    def __init__(self, session_id=None):
+    def __init__(self, session_id=None, user_id=None):
         # 基础设置
         self.session_id = session_id or str(uuid.uuid4())
+        self.user_id = None if user_id is None else str(user_id)
         self.shared_state = None
         self.unrelated_callback = None
         
@@ -34,7 +35,8 @@ class ConsultantAgent:
         self.consultation_processor = ConsultationProcessor(
             self.knowledge_retriever,
             self.consultation_classifier,
-            self.response_generator
+            self.response_generator,
+            user_id=self.user_id,
         )
 
     def _initialize_llm(self):

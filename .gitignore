@@ -51,6 +51,8 @@ htmlcov/
 # --- IDE / OS ---
 .idea/
 .vscode/
+.agents/
+openspec/
 *.swp
 *.swo
 .DS_Store

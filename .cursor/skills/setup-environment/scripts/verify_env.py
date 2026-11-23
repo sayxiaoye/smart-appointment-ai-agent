@@ -39,7 +39,7 @@ PACKAGES: list[tuple[str, str]] = [
 
 CHAT_PROVIDERS = {"qwen", "deepseek", "zhipu", "openai", "openai-compatible"}
 EMBEDDING_PROVIDERS = {"qwen", "zhipu", "openai", "openai-compatible"}
-PLACEHOLDER_HINTS = ("your_",)
+PLACEHOLDER_HINTS = ("your_", "replace_with_a_long_random_string")
 
 GREEN, RED, YELLOW, OFF = "\033[32m", "\033[31m", "\033[33m", "\033[0m"
 
@@ -86,6 +86,7 @@ def check_env(project_root: Path) -> tuple[list[str], list[str]]:
         required.append(f"unsupported MODEL_PROVIDER={provider}")
 
     required.append("EMBEDDING_PROVIDER")
+    required.append("SESSION_SECRET")
     if embedding_provider == "azure":
         required.extend([
             "AZURE_OPENAI_API_KEY",

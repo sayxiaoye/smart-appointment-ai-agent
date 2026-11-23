@@ -14,8 +14,10 @@ from config.constants import busy_periods_dict
 class AppointmentDatabase:
     """预约数据库操作器"""
     
-    def __init__(self):
+    def __init__(self, user_id: str = None, db_path: str = None):
         # 延迟导入Services避免循环依赖
+        self.user_id = None if user_id is None else str(user_id)
+        self.db_path = db_path
         self._appointment_service = None
         self._user_behavior_service = None
     
@@ -24,7 +26,9 @@ class AppointmentDatabase:
         """懒加载预约服务"""
         if self._appointment_service is None:
             from services.appointment_service import AppointmentService
-            self._appointment_service = AppointmentService()
+            self._appointment_service = (
+                AppointmentService(self.db_path) if self.db_path else AppointmentService()
+            )
         return self._appointment_service
     
     @property 
@@ -32,7 +36,9 @@ class AppointmentDatabase:
         """懒加载用户行为服务"""
         if self._user_behavior_service is None:
             from services.user_behavior_service import UserBehaviorService
-            self._user_behavior_service = UserBehaviorService()
+            self._user_behavior_service = (
+                UserBehaviorService(self.db_path) if self.db_path else UserBehaviorService()
+            )
         return self._user_behavior_service
     
     def save_appointment(self, host_id, start_time: datetime,
@@ -64,6 +70,9 @@ class AppointmentDatabase:
                             host_id, appointment_history: Dict[str, Any],
                             session_id: str):
         """记录用户预约行为"""
+        if not self.user_id:
+            print("未绑定登录用户，跳过行为记录")
+            return
         try:
             stored_host_id = None if host_id in (None, "", "None") else int(host_id)
             action_data = {
@@ -78,11 +87,15 @@ class AppointmentDatabase:
                 "host_name": self._booked_host_name(stored_host_id, appointment_history),
             }
             self.user_behavior_service.record_behavior(
-                user_id="default_user",
+                user_id=self.user_id,
                 action_type="appointment",
                 action_data=action_data,
                 host_id=stored_host_id,
                 session_id=session_id,
+            )
+            from agents.user_behavior.preference_manager import PreferenceManager
+            PreferenceManager(self.user_behavior_service).update_preferences_from_appointment(
+                self.user_id, action_data, stored_host_id
             )
             
         except Exception as behavior_error:

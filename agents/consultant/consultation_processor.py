@@ -15,10 +15,12 @@ class ConsultationProcessor:
     
     def __init__(self, knowledge_retriever: KnowledgeRetriever, 
                  consultation_classifier: ConsultationClassifier,
-                 response_generator: ResponseGenerator):
+                 response_generator: ResponseGenerator,
+                 user_id: str = None):
         self.knowledge_retriever = knowledge_retriever
         self.consultation_classifier = consultation_classifier
         self.response_generator = response_generator
+        self.user_id = None if user_id is None else str(user_id)
     
     async def process_consultation(self, user_input: str) -> str:
         """处理标准咨询"""
@@ -62,6 +64,8 @@ class ConsultationProcessor:
     
     async def _record_consultation_behavior(self, user_input: str, knowledge_docs: list, session_id: str):
         """记录咨询行为"""
+        if not self.user_id:
+            return
         try:
             from agents.user_behavior_agent import UserBehaviorAgent
             behavior_agent = UserBehaviorAgent()
@@ -75,7 +79,8 @@ class ConsultationProcessor:
             behavior_agent.record_behavior(
                 action_type='consultation',
                 action_data=action_data,
-                session_id=session_id
+                session_id=session_id,
+                user_id=self.user_id,
             )
             
         except Exception as behavior_error:

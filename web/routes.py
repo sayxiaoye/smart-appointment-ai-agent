@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+from api.auth import require_login
 from api.chat_handler import ProcessUserInput_stream
 import logging
 
@@ -27,19 +28,31 @@ async def read_root(request: Request):
     """渲染主页聊天界面"""
     return templates.TemplateResponse("index.html", {"request": request})
 
+@router.get("/login", response_class=HTMLResponse, summary="登录页")
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@router.get("/register", response_class=HTMLResponse, summary="注册页")
+async def register_page(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request})
+
 @router.post("/chat/stream", summary="流式聊天")
-async def chat_stream_endpoint(chat: ChatRequest):
-    """处理流式聊天请求"""
+async def chat_stream_endpoint(chat: ChatRequest, request: Request):
+    """处理流式聊天请求。未登录在进入 Agent 前拒绝。"""
+    user = require_login(request)
+
     async def token_generator():
-        async for token in ProcessUserInput_stream(chat.message):
+        async for token in ProcessUserInput_stream(chat.message, user_id=str(user["id"])):
             yield token
     return StreamingResponse(token_generator(), media_type="text/plain")
 
 @router.post("/chat", summary="兼容性聊天接口")
-async def chat_endpoint(chat: ChatRequest):
+async def chat_endpoint(chat: ChatRequest, request: Request):
     """兼容性聊天接口，建议使用/chat/stream"""
+    user = require_login(request)
+
     async def token_generator():
-        async for token in ProcessUserInput_stream(chat.message):
+        async for token in ProcessUserInput_stream(chat.message, user_id=str(user["id"])):
             yield token
     return StreamingResponse(token_generator(), media_type="text/plain")
 

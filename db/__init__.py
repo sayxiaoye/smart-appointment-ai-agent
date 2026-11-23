@@ -13,7 +13,7 @@ from .repositories import HostRepository, GameRepository, KnowledgeRepository, U
 from .base import SessionManager
 from .models import (
     Base, Host, HostSchedule, Game,
-    KnowledgeDocument, UserBehavior, UserPreference, UserRecommendation
+    KnowledgeDocument, User, UserBehavior, UserPreference, UserRecommendation
 )
 
 __all__ = [
@@ -30,6 +30,7 @@ __all__ = [
     'HostSchedule',
     'Game',
     'KnowledgeDocument',
+    'User',
     'UserBehavior',
     'UserPreference',
     'UserRecommendation'

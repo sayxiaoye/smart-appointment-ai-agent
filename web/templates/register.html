@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - 智能预约助手</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card {
+            width: min(420px, 92vw);
+            background: #fff;
+            border-radius: 16px;
+            padding: 32px 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,.15);
+        }
+        h1 { margin: 0 0 8px; font-size: 24px; }
+        p { margin: 0 0 20px; color: #666; }
+        label { display: block; margin: 12px 0 6px; font-size: 14px; }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            margin-top: 18px;
+            padding: 12px;
+            border: 0;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .error { color: #c0392b; min-height: 1.2em; margin-top: 12px; }
+        a { color: #4facfe; }
+    </style>
+</head>
+<body>
+    <form class="card" id="register-form">
+        <h1>注册</h1>
+        <p>称呼会用在回访提醒里。</p>
+        <label for="username">用户名</label>
+        <input id="username" name="username" autocomplete="username" required>
+        <label for="password">密码</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+        <label for="display-name">称呼</label>
+        <input id="display-name" name="display_name" required>
+        <button id="submit" type="submit">注册并进入聊天</button>
+        <div class="error" id="form-error"></div>
+        <p>已有账号？<a href="/login">登录</a></p>
+    </form>
+    <script>
+        document.getElementById("register-form").addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const error = document.getElementById("form-error");
+            error.textContent = "";
+            const response = await fetch("/api/auth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: document.getElementById("username").value,
+                    password: document.getElementById("password").value,
+                    display_name: document.getElementById("display-name").value
+                })
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                error.textContent = data.detail || "注册失败";
+                return;
+            }
+            window.location.href = "/";
+        });
+    </script>
+</body>
+</html>

@@ -162,6 +162,7 @@ EMBEDDING_API_KEY=your_embedding_api_key_here
 EMBEDDING_BASE_URL=your_openai_compatible_embedding_base_url_here
 EMBEDDING_MODEL=your_embedding_model_name_here
 OPENWEATHER_API_KEY=your_openweather_api_key_here
+SESSION_SECRET=replace_with_a_long_random_string
 "@ | Set-Content -Path $EnvExample -Encoding UTF8
   Write-Ok ".env.example created"
 }

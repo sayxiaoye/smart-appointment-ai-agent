@@ -49,6 +49,14 @@ class KnowledgeDocument(Base):
     is_active = Column(Integer, default=1)
 
 
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    username = Column(String, unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    display_name = Column(String, nullable=False)
+
+
 class UserBehavior(Base):
     __tablename__ = "user_behaviors"
     id = Column(Integer, primary_key=True)

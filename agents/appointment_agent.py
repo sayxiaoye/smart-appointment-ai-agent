@@ -25,9 +25,10 @@ class AppointmentAgent:
     3. 协调整个预约流程
     """
     
-    def __init__(self, session_id=None, unrelated_callback=None):
+    def __init__(self, session_id=None, unrelated_callback=None, user_id=None, db_path=None):
         # 基础设置
         self.session_id = session_id or str(uuid.uuid4())
+        self.user_id = None if user_id is None else str(user_id)
         self.unrelated_callback = unrelated_callback
         self.state = None
         
@@ -38,7 +39,7 @@ class AppointmentAgent:
         self.input_parser = InputParser(self.llm)
         self.host_finder = HostFinder()
         self.message_builder = MessageBuilder()
-        self.appointment_database = AppointmentDatabase()
+        self.appointment_database = AppointmentDatabase(user_id=self.user_id, db_path=db_path)
         self.appointment_processor = AppointmentProcessor(
             self.input_parser,
             self.host_finder,
@@ -158,9 +159,11 @@ class AppointmentAgent:
         yield f"[REPLY][预约机器人]{reply}"
 
     def _latest_saved_appointment(self):
+        if not self.user_id:
+            return None
         try:
             records = self.appointment_database.user_behavior_service.get_user_behaviors(
-                "default_user", action_type="appointment"
+                self.user_id, action_type="appointment"
             )
         except Exception:
             return None

@@ -60,11 +60,15 @@ class UserBehaviorAgent:
         return create_chat_model(temperature=0.7)
     
     def record_behavior(self, action_type: str, action_data: Dict[str, Any],
-                       host_id: str = None, session_id: str = "default_session") -> bool:
-        """记录用户行为"""
+                       host_id: str = None, session_id: str = "default_session",
+                       user_id: str = None) -> bool:
+        """记录当前登录用户的行为。没有用户身份时不写入。"""
+        if not user_id:
+            self.logger.error("缺少用户身份，拒绝记录行为")
+            return False
         try:
             return self.user_behavior_service.record_behavior(
-                user_id="default_user",
+                user_id=str(user_id),
                 action_type=action_type,
                 action_data=action_data,
                 host_id=host_id,
@@ -73,17 +77,18 @@ class UserBehaviorAgent:
         except Exception as e:
             self.logger.error(f"记录用户行为失败: {str(e)}")
             try:
-                return self.behavior_recorder.record_behavior(
+                return bool(self.behavior_recorder.record_behavior(
                     action_type=action_type,
                     action_data=action_data,
                     host_id=host_id,
-                    session_id=session_id
-                )
+                    session_id=session_id,
+                    user_id=str(user_id),
+                ))
             except Exception as fallback_error:
                 self.logger.error(f"回退方法也失败: {str(fallback_error)}")
                 return False
     
-    def get_user_analysis(self, user_id: str = "default_user") -> Optional[Dict[str, Any]]:
+    def get_user_analysis(self, user_id: str) -> Optional[Dict[str, Any]]:
         """获取用户分析数据"""
         try:
             preferences = self.pattern_analyzer.analyze_user_preferences(user_id)
@@ -119,8 +124,9 @@ class UserBehaviorAgent:
             self.logger.error(f"生成提醒消息失败: {str(e)}")
             return None
 
-    async def generate_personalized_reminder(self, user_id: str = "default_user", 
-                                           available_times: list = None) -> Optional[str]:
+    async def generate_personalized_reminder(self, user_id: str,
+                                           available_times: list = None,
+                                           display_name: str = None) -> Optional[str]:
         """使用LLM生成个性化回访提醒消息"""
         try:
             self.logger.info(f"开始生成个性化提醒，用户ID: {user_id}")
@@ -128,9 +134,10 @@ class UserBehaviorAgent:
             
             # 获取用户分析数据
             analysis = self.get_user_analysis(user_id)
+            name = (display_name or "").strip() or "您"
             if not analysis or not analysis.get('favorite_host_id'):
                 self.logger.info("没有找到用户偏好数据，使用默认消息")
-                return "尊敬的Tom，您好！好久没见了，要不要再约一局桌游？"
+                return f"尊敬的{name}，您好！好久没见了，要不要再约一局桌游？"
 
             self.logger.info(f"用户分析数据: {analysis}")
 
@@ -148,7 +155,7 @@ class UserBehaviorAgent:
             prompt = f"""请为桌游店生成一条温暖的回访消息。
 
 客户信息：
-- 称呼：尊敬的Tom
+- 称呼：{name}
 - 常约主持人：{host_name}
 - 主持人专长：{specialty}
 - 常玩的游戏：{game}
@@ -178,13 +185,13 @@ class UserBehaviorAgent:
             # 回退到传统方法
             return self.generate_reminder_message(user_id)
 
-    async def get_reminder_with_schedule(self, user_id: str = "default_user") -> Dict[str, Any]:
+    async def get_reminder_with_schedule(self, user_id: str, display_name: str = None) -> Dict[str, Any]:
         """获取包含时间安排的完整提醒信息"""
         try:
             # 获取用户分析数据
             analysis = self.get_user_analysis(user_id)
             if not analysis or not analysis.get('favorite_host_id'):
-                message = await self.generate_personalized_reminder(user_id, [])
+                message = await self.generate_personalized_reminder(user_id, [], display_name)
                 return {
                     "message": message,
                     "host_available_times": []
@@ -232,7 +239,7 @@ class UserBehaviorAgent:
                             break
             
             # 生成个性化消息
-            message = await self.generate_personalized_reminder(user_id, available_times)
+            message = await self.generate_personalized_reminder(user_id, available_times, display_name)
             
             return {
                 "message": message,
@@ -242,6 +249,6 @@ class UserBehaviorAgent:
         except Exception as e:
             self.logger.error(f"获取提醒信息失败: {type(e).__name__}: {str(e)}")
             return {
-                "message": "尊敬的Tom，您好！系统暂时无法查询主持人时间，请稍后再试或直接联系我们预约。",
+                "message": f"尊敬的{(display_name or '').strip() or '您'}，您好！系统暂时无法查询主持人时间，请稍后再试或直接联系我们预约。",
                 "host_available_times": []
             }

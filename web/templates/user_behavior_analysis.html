@@ -340,7 +340,7 @@
                             <div style="color: #666; font-size: 14px;">建议发送提醒</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 28px; font-weight: bold; color: #667eea; margin-bottom: 8px;">default_user</div>
+                            <div id="currentUserName" style="font-size: 28px; font-weight: bold; color: #667eea; margin-bottom: 8px;">—</div>
                             <div style="color: #666; font-size: 14px;">当前分析用户</div>
                         </div>
                     </div>
@@ -359,6 +359,13 @@
 
         async function loadUserAnalysis() {
             try {
+                const identityResponse = await fetch('/api/auth/me');
+                const identity = await identityResponse.json();
+                if (!identity.authenticated) {
+                    window.location.href = '/login';
+                    return;
+                }
+                document.getElementById('currentUserName').textContent = identity.display_name;
                 console.log('开始加载用户分析数据...');
                 
                 // 使用与服务器一致的地址和端口
@@ -375,6 +382,10 @@
                 
                 console.log('API响应状态:', response.status);
                 
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
                 if (!response.ok) {
                     throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
                 }
@@ -444,9 +455,7 @@
                         'Accept': 'application/json',
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        user_id: 'default_user'
-                    })
+                    body: JSON.stringify({})
                 });
 
                 if (!response.ok) {

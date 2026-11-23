@@ -1,26 +1,34 @@
 from agents.task_classification_agent import TaskClassificationAgent
 from agents.appointment_agent import AppointmentAgent
 from agents.consultant_agent import ConsultantAgent
-import uuid
 
-# 全局session_id用于单用户场景
-global_session_id = str(uuid.uuid4())
+_agents = {}
 
-task_agent = TaskClassificationAgent(
-    AppointmentAgent(session_id=global_session_id), 
-    ConsultantAgent(session_id=global_session_id)
-)
 
-async def ProcessUserInput_stream(user_input, state=None, context=None):
-    """
-    user_input: 用户输入
-    state: 当前对话状态（如 None, 'classify', 'appointment', 'query', ...）
-    context: 可选，保存多轮对话上下文（如 dict，可存储 agent 的 history 等）
-    返回: (reply, next_state, next_context)
-    """
-    # 初始化 context
-    if context is None:
-        context = {}
+def build_task_agent(user_id: str) -> TaskClassificationAgent:
+    """为该登录用户创建独立的分类、预约和咨询状态。"""
+    session_id = f"user-{user_id}"
+    return TaskClassificationAgent(
+        AppointmentAgent(session_id=session_id, user_id=str(user_id)),
+        ConsultantAgent(session_id=session_id, user_id=str(user_id)),
+    )
 
-    async for token in task_agent.classify_task_stream(user_input):
+
+def get_task_agent(user_id: str) -> TaskClassificationAgent:
+    key = str(user_id)
+    agent = _agents.get(key)
+    if agent is None:
+        agent = build_task_agent(key)
+        _agents[key] = agent
+    return agent
+
+
+def reset_task_agents() -> None:
+    _agents.clear()
+
+
+async def ProcessUserInput_stream(user_input, user_id: str, state=None, context=None):
+    """按登录用户处理聊天。未登录的请求不得进入这里。"""
+    agent = get_task_agent(str(user_id))
+    async for token in agent.classify_task_stream(user_input):
         yield token

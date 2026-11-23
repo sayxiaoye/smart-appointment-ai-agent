@@ -1,5 +1,5 @@
 from .base import SessionManager
-from .repositories import HostRepository, GameRepository, KnowledgeRepository, UserBehaviorRepository
+from .repositories import HostRepository, GameRepository, KnowledgeRepository, UserBehaviorRepository, UserRepository
 from typing import Optional
 
 
@@ -26,6 +26,7 @@ class DatabaseRouter:
         self.game_repo = GameRepository(self.session_manager)
         self.knowledge_repo = KnowledgeRepository(self.session_manager)
         self.user_behavior_repo = UserBehaviorRepository(self.session_manager)
+        self.user_repo = UserRepository(self.session_manager)
 
     @property
     def hosts(self) -> HostRepository:
@@ -41,6 +42,11 @@ class DatabaseRouter:
     def knowledge(self) -> KnowledgeRepository:
         """获取知识库数据仓库"""
         return self.knowledge_repo
+
+    @property
+    def users(self) -> UserRepository:
+        """获取用户账号仓库"""
+        return self.user_repo
 
     @property
     def user_behavior(self) -> UserBehaviorRepository:

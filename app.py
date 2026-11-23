@@ -4,9 +4,15 @@ FastAPI应用程序
 主应用程序入口，配置中间件、路由和异常处理
 自动初始化知识库、游戏目录和主持人数据
 """
+import os
+
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+
+from config.session_secret import require_session_secret
 from services.knowledge_service import KnowledgeService
 from services.host_service import HostService
 from services.game_catalog_service import GameCatalogService
@@ -39,6 +45,9 @@ class SearchRequest(BaseModel):
 
 async def initialize_system():
     """系统启动时自动初始化"""
+    if os.getenv("SKIP_SYSTEM_INIT") == "1":
+        logger.info("跳过系统初始化")
+        return
     try:
         logger.info("🚀 正在初始化智能预约系统...")
         
@@ -69,7 +78,9 @@ async def initialize_system():
 
 def create_app() -> FastAPI:
     """创建FastAPI应用实例"""
-    
+    load_dotenv()
+    session_secret = require_session_secret()
+
     app = FastAPI(
         title="智能预约AI代理",
         description="提供预约管理、智能咨询、用户行为分析等功能的API服务",
@@ -78,7 +89,12 @@ def create_app() -> FastAPI:
         redoc_url="/redoc"
     )
 
-    # 添加CORS中间件
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=session_secret,
+        same_site="lax",
+        https_only=False,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],  # 生产环境中应该设置具体的域名

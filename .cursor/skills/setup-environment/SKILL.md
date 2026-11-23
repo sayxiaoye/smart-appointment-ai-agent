@@ -183,8 +183,9 @@ If a `.env` already exists, leave it alone. Otherwise copy `.env.example` to `.e
 | `EMBEDDING_MODEL` | ✅ for non-Azure | Embedding model name provided by the selected provider |
 | `AZURE_OPENAI_*` | ✅ only for Azure | Used when provider is `azure` |
 | `OPENWEATHER_API_KEY` | ⚠ optional | Used by the MCP weather tool |
+| `SESSION_SECRET` | ✅ | Long random string for the login cookie. The app refuses to start if it is missing or still `replace_with_a_long_random_string`. |
 
-If any required key still equals the placeholder (`your_..._here`), pause and ask the user to fill it in before continuing. **Never commit a populated `.env`.**
+If any required key still equals the placeholder (`your_..._here` or `replace_with_a_long_random_string`), pause and ask the user to fill it in before continuing. Generate `SESSION_SECRET` locally and do not commit it. **Never commit a populated `.env`.**
 
 ### 7. Ensure data directory
 

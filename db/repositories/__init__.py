@@ -12,10 +12,12 @@ from .host_repository import HostRepository
 from .game_repository import GameRepository
 from .knowledge_repository import KnowledgeRepository
 from .user_behavior_repository import UserBehaviorRepository
+from .user_repository import UserRepository
 
 __all__ = [
     "HostRepository",
     "GameRepository",
     "KnowledgeRepository",
     "UserBehaviorRepository",
+    "UserRepository",
 ]
