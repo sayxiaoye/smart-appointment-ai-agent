@@ -99,6 +99,9 @@ class AppointmentAgent:
         if is_status_question(user_input):
             async for token in self.stream_status():
                 yield token
+            if self.state is not None:
+                from config.constants import StateEnum
+                self.state.value = StateEnum.CLASSIFY
             return
         
         # 1. 解析用户输入（内部 JSON，不向用户流式输出，避免英文字段名暴露在聊天界面）

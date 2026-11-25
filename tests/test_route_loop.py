@@ -100,8 +100,8 @@ def test_status_question_does_not_bounce_forever():
 
     reply = _collect(processor, "当前预约状态")
 
-    assert classifier.calls == 2
-    assert consultant.calls == 1
+    assert classifier.calls == 0
+    assert consultant.calls == 0
     assert appointment.status_calls == 1
     assert "当前没有进行中的预约" in reply
     assert state.value == StateEnum.CLASSIFY

@@ -10,6 +10,7 @@
 
 from typing import AsyncGenerator, Optional
 from agents.appointment.message_builder import is_status_question
+from agents.factual.responder import FactualResponder
 from .task_classifier import TaskClassifier
 from .state_manager import StateManager
 from .agent_router import AgentRouter
@@ -37,6 +38,7 @@ class ClassificationProcessor:
         self.state_manager = state_manager
         self.agent_router = agent_router
         self.unrelated_handler = unrelated_handler
+        self.factual_responder = FactualResponder()
         self._reject_depth = 0
         self._rejected_agents = set()
     
@@ -72,6 +74,11 @@ class ClassificationProcessor:
 
             # 检查是否需要进行分类
             if self.state_manager.should_classify():
+                factual = await self.factual_responder.reply(task, self.agent_router.appointment_agent)
+                if factual:
+                    self.state_manager.reset_to_classify()
+                    yield factual
+                    return
                 # 进行任务分类
                 category = await self.task_classifier.classify_task(task)
                 async for token in self._route_classified_task(task, category):
@@ -124,6 +131,10 @@ class ClassificationProcessor:
         try:
             # 检查是否需要进行分类
             if self.state_manager.should_classify():
+                factual = await self.factual_responder.reply(task, self.agent_router.appointment_agent)
+                if factual:
+                    self.state_manager.reset_to_classify()
+                    return factual
                 category = await self.task_classifier.classify_task(task)
                 
                 if category == "appointment" and self.agent_router.appointment_agent:
