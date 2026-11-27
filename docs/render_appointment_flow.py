@@ -25,10 +25,8 @@ PNG = ROOT / "appointment-flow.png"
 
 FONT = 14
 LINE = 20
-GAP = 34
-CANVAS_W = 980
-LEFT_CX = 214
-RAIL_X = 952
+GAP = 28
+CANVAS_W = 1980
 
 COLORS = {
     "classify": {"fill": "#f7f0fc", "stroke": "#7d5eab", "head": "#7d5eab", "bg": "#faf6fd"},
@@ -247,10 +245,10 @@ def outgoing(edges, src, kind):
 
 def measure_node(node):
     if node.kind == "ask":
-        inner = node.box_w * 0.60
+        inner = node.box_w * 0.62
         node.lines = wrap(node.text, inner)
         node.w = node.box_w
-        node.h = max(90, len(node.lines) * LINE + 54)
+        node.h = max(92, len(node.lines) * LINE + 52)
     else:
         node.lines = wrap(node.text, node.box_w - 28)
         node.w = node.box_w
@@ -258,44 +256,29 @@ def measure_node(node):
 
 
 def assign_sizes(bands, nodes, branch, edges):
-    band_place = {band["id"]: band["place"] for band in bands}
+    del bands
     for nid, node in nodes.items():
-        place = band_place[node.band]
-        kids = [
-            edge
-            for edge in edges
-            if edge.src == nid and edge.kind in {"down", "yes", "no"} and edge.dst in branch
-        ]
-        if nid in branch and any(edge.dst == nid and edge.kind in {"yes", "no"} for edge in edges):
+        paired = any(edge.dst == nid and edge.kind in {"yes", "no"} for edge in edges)
+        if paired:
             node.box_w = 196
-        elif nid in branch and node.kind == "ask":
-            node.box_w = 188
-        elif nid in branch and kids:
+        elif node.kind == "ask":
             node.box_w = 236
         elif nid in branch:
-            node.box_w = 228 if place == "full" else 214
-        elif place == "left" and node.kind == "ask":
-            node.box_w = 252
-        elif place == "left":
-            node.box_w = 236
-        elif place == "right" and node.kind == "ask":
-            node.box_w = 214
-        elif place == "right":
-            node.box_w = 214
-        elif node.kind == "ask":
-            node.box_w = 252
+            node.box_w = 210
         else:
-            node.box_w = 236
+            node.box_w = 220
         measure_node(node)
-
-
-def header_height(title, duty, width):
-    duty_lines = wrap(duty, width - 28, 12) if duty else []
-    return 28 + (len(duty_lines) * 16 if duty_lines else 0) + 14, duty_lines
 
 
 def spine_of(band, branch):
     return [nid for nid in band["nodes"] if nid not in branch]
+
+
+def side_child(edges, nodes, nid):
+    for edge in outgoing(edges, nid, "right"):
+        if same_band(nodes, nid, edge.dst):
+            return edge.dst
+    return None
 
 
 def place_tree(root, center_x, top, nodes, edges, pos):
@@ -303,194 +286,181 @@ def place_tree(root, center_x, top, nodes, edges, pos):
     pos[root] = Box(center_x - node.w / 2, top, node.w, node.h)
     yes = outgoing(edges, root, "yes")
     no = outgoing(edges, root, "no")
-    cursor = top + node.h + (34 if yes and no else 16)
     down = outgoing(edges, root, "down")
     if yes and no:
         left_n = nodes[yes[0].dst]
         right_n = nodes[no[0].dst]
-        gap = 14
-        total = left_n.w + gap + right_n.w
-        left = center_x - total / 2
-        row_h = max(left_n.h, right_n.h)
-        pos[yes[0].dst] = Box(left, cursor, left_n.w, left_n.h)
-        pos[no[0].dst] = Box(left + left_n.w + gap, cursor, right_n.w, right_n.h)
-        return cursor + row_h
-    if down:
-        return place_tree(down[0].dst, center_x, cursor, nodes, edges, pos)
-    return top + node.h
+        row_top = pos[root].bottom + 36
+        gap = 18
+        left = center_x - (left_n.w + gap + right_n.w) / 2
+        pos[yes[0].dst] = Box(left, row_top, left_n.w, left_n.h)
+        pos[no[0].dst] = Box(left + left_n.w + gap, row_top, right_n.w, right_n.h)
+        return max(pos[yes[0].dst].bottom, pos[no[0].dst].bottom)
+    if down and same_band(nodes, root, down[0].dst):
+        return place_tree(down[0].dst, center_x, pos[root].bottom + GAP, nodes, edges, pos)
+    return pos[root].bottom
 
 
-def layout_panel(band, anchor_cy, nodes, edges, branch, pos, panels, prev_bottom):
-    spine = spine_of(band, branch)
-    if not spine:
-        raise SystemExit(f"{band['title']} 没有主线上的节点")
-    rel = {}
-    cursor = 0
-    bottoms = []
-    for nid in spine:
+def place_column(band, nodes, edges, branch, spine_cx, side_cx, top, pos):
+    y = top
+    bottoms = [top]
+    for nid in spine_of(band, branch):
         node = nodes[nid]
-        rel[nid] = Box(0, cursor, node.w, node.h)
-        bottom = cursor + node.h
-        right = outgoing(edges, nid, "right")
-        if right and same_band(nodes, nid, right[0].dst):
-            child = nodes[right[0].dst]
-            child_top = cursor + node.h / 2 - child.h / 2
-            if child_top < cursor:
-                child_top = cursor
-            tree_bottom = place_tree(right[0].dst, 0, child_top, nodes, edges, rel)
-            # place_tree used center 0; shift x later. Keep y.
-            bottom = max(bottom, tree_bottom)
-        cursor = bottom + GAP
-        bottoms.append(bottom)
-    entry = spine[0]
-    entry_cy = rel[entry].y + rel[entry].h / 2
-    shift = anchor_cy - entry_cy
-    content_top = min(box.y for box in rel.values()) + shift
-    content_bottom = max(box.bottom for box in rel.values()) + shift
-    head_h, duty_lines = header_height(band["title"], band["duty"], 500)
-    header_top = content_top - head_h - 8
-    if prev_bottom is not None and header_top < prev_bottom + 10:
-        extra = prev_bottom + 10 - header_top
-        shift += extra
-        header_top += extra
-        content_top += extra
-        content_bottom += extra
-    ask_cx = 560
-    out_cx = 812
-    for nid, box in rel.items():
-        node = nodes[nid]
-        cx = ask_cx if nid not in branch else out_cx
-        if nid in branch and node.kind == "ask":
-            cx = out_cx
-        if nid in branch and any(edge.dst == nid and edge.kind in {"yes", "no"} for edge in edges):
-            # pair members keep the x that place_tree will not have set (center 0)
-            pass
-        pos[nid] = Box(cx - node.w / 2, box.y + shift, node.w, node.h)
-    # Re-place branch trees with real x, because the relative pass used center 0
-    # and pair nodes were stored in `rel` not separated. Rebuild branch x cleanly.
-    for nid in spine:
-        right = outgoing(edges, nid, "right")
-        if not (right and same_band(nodes, nid, right[0].dst)):
-            continue
-        parent = pos[nid]
-        child_id = right[0].dst
-        # remove previous absolute boxes for this tree and place again
-        tree_ids = []
+        pos[nid] = Box(spine_cx - node.w / 2, y, node.w, node.h)
+        row_bottom = pos[nid].bottom
+        child_id = side_child(edges, nodes, nid)
+        if child_id:
+            child = nodes[child_id]
+            follows = any(outgoing(edges, child_id, kind) for kind in ("down", "yes", "no"))
+            child_top = pos[nid].cy - child.h / 2
+            if child_top < y:
+                shift = y - child_top
+                pos[nid] = Box(pos[nid].x, pos[nid].y + shift, pos[nid].w, pos[nid].h)
+                child_top = y
+            if follows:
+                row_bottom = max(row_bottom, place_tree(child_id, side_cx, child_top, nodes, edges, pos))
+            else:
+                pos[child_id] = Box(side_cx - child.w / 2, child_top, child.w, child.h)
+                row_bottom = max(pos[nid].bottom, pos[child_id].bottom)
+        bottoms.append(row_bottom)
+        y = row_bottom + GAP
+    return max(bottoms)
 
-        def collect(cur):
-            tree_ids.append(cur)
-            for kind in ("down", "yes", "no"):
-                for edge in outgoing(edges, cur, kind):
-                    if edge.dst in branch:
-                        collect(edge.dst)
 
-        collect(child_id)
-        child = nodes[child_id]
-        child_top = parent.cy - child.h / 2
-        if child_top < parent.top:
-            child_top = parent.top
-        place_tree(child_id, out_cx, child_top, nodes, edges, pos)
-        content_bottom = max(content_bottom, max(pos[tid].bottom for tid in tree_ids))
-    panel = {
-        "band": band,
-        "header_top": header_top,
-        "head_h": head_h,
-        "duty_lines": duty_lines,
-        "bottom": content_bottom + 12,
-        "left": 430,
-        "right": 936,
-    }
-    panels.append(panel)
-    # The anchor node may now sit above the pushed panel. Caller handles anchor push.
-    return panel, shift - (anchor_cy - entry_cy)
+def duty_lines(text, width):
+    return wrap(text, width - 36, 12) if text else []
+
+
+def header_block(text, width):
+    lines = duty_lines(text, width)
+    return 36 + len(lines) * 16 + 8, lines
 
 
 def layout(bands, nodes, order, edges, branch):
-    pos = {}
-    panels = []
-    left_bands = [band for band in bands if band["place"] == "left"]
-    full_bands = [band for band in bands if band["place"] == "full"]
-    left_spine = []
-    for band in left_bands:
-        left_spine.extend(spine_of(band, branch))
+    del order
+    global CANVAS_W
+    by_id = {band["id"]: band for band in bands}
+    margin_l, margin_r = 34, 28
+    book_w, class_w, consult_w = 620, 760, 640
+    gap_l, gap_r = 108, 96
+    book_x = margin_l
+    class_x = book_x + book_w + gap_l
+    consult_x = class_x + class_w + gap_r
+    canvas_w = consult_x + consult_w + margin_r
 
-    legend_h = 92
-    y = 16 + legend_h
-    left_title = left_bands[0]["title"] if left_bands else "归类机器人"
-    left_duty = left_bands[0]["duty"] if left_bands else ""
-    left_head_h, left_duty_lines = header_height(left_title, left_duty, 340)
-    regions = {
-        "legend_h": legend_h,
-        "left_header": Box(72, y, 340, left_head_h),
-        "left_duty_lines": left_duty_lines,
-        "left_title": left_title,
+    ask_w, out_w = 236, 220
+    book_rail = book_x + 40
+    book_side_cx = book_rail + 18 + out_w / 2
+    book_spine_cx = book_x + book_w - 16 - ask_w / 2
+    class_spine_cx = class_x + 56 + ask_w / 2
+    class_side_cx = class_spine_cx + ask_w / 2 + 84 + out_w / 2
+    consult_spine_cx = consult_x + 18 + ask_w / 2
+    consult_side_cx = consult_spine_cx + ask_w / 2 + 72 + out_w / 2
+    commit_side_cx = class_spine_cx + ask_w / 2 + 56 + (196 + 18 + 196) / 2
+
+    legend_bottom = 96
+    y_above = 112
+    y_hand = 132
+    col_top = 150
+    heads = {
+        key: header_block(by_id[key]["duty"], width)
+        for key, width in (("book", book_w), ("classify", class_w - 40), ("consult", consult_w))
     }
-    y += left_head_h + 12
-    prev_panel_bottom = None
-    anchor_shift_note = []
-    for nid in left_spine:
-        entry = None
-        for edge in outgoing(edges, nid, "right"):
-            if not same_band(nodes, nid, edge.dst):
-                entry = edge
-                break
-        node = nodes[nid]
-        if entry and prev_panel_bottom is not None:
-            y = max(y, prev_panel_bottom + 78)
-        pos[nid] = Box(LEFT_CX - node.w / 2, y, node.w, node.h)
-        if entry:
-            target_band = band_of(bands, entry.dst)
-            panel, extra = layout_panel(
-                target_band, pos[nid].cy, nodes, edges, branch, pos, panels, prev_panel_bottom
-            )
-            if extra:
-                pos[nid] = Box(pos[nid].x, pos[nid].y + extra, pos[nid].w, pos[nid].h)
-                anchor_shift_note.append((nid, extra))
-            prev_panel_bottom = panel["bottom"]
-            y = panel["bottom"] + GAP
-        else:
-            y = pos[nid].bottom + GAP
-    regions["upper_bottom"] = y
-    regions["panels"] = panels
-    regions["left_bottom"] = max([pos[nid].bottom for nid in left_spine] + [y])
+    head_h = max(item[0] for item in heads.values())
+    content_top = col_top + head_h + 14
 
-    # Full-width commit spine
-    commit_top = regions["left_bottom"] + 8
-    regions["commit_top"] = commit_top
-    if not full_bands:
-        regions["canvas_h"] = commit_top + 20
-        return pos, regions
-    band = full_bands[0]
-    head_h, duty_lines = header_height(band["title"], band["duty"], CANVAS_W - 80)
-    regions["commit_header"] = Box(48, commit_top, CANVAS_W - 70, head_h)
-    regions["commit_head_h"] = head_h
-    regions["commit_duty_lines"] = duty_lines
-    regions["commit_title"] = band["title"]
-    y = commit_top + head_h + 16
-    commit_out_cx = 690
-    for nid in spine_of(band, branch):
-        node = nodes[nid]
-        pos[nid] = Box(LEFT_CX - node.w / 2, y, node.w, node.h)
-        bottom = pos[nid].bottom
-        right = outgoing(edges, nid, "right")
-        if right and same_band(nodes, nid, right[0].dst):
-            child = nodes[right[0].dst]
-            child_top = pos[nid].cy - child.h / 2
-            if child_top < pos[nid].top:
-                child_top = pos[nid].top
-            tree_bottom = place_tree(right[0].dst, commit_out_cx, child_top, nodes, edges, pos)
-            bottom = max(bottom, tree_bottom)
-        y = bottom + GAP
-    regions["canvas_h"] = y + 24
+    pos = {}
+    class_bottom = place_column(by_id["classify"], nodes, edges, branch, class_spine_cx, class_side_cx, content_top, pos)
+    # 预约改草稿从「上下文补全」下方空出一条带：上沿给「还有片段」横穿，再往下才是交给预约
+    book_top = pos["q_ctx"].bottom + 64
+    book_bottom = place_column(by_id["book"], nodes, edges, branch, book_spine_cx, book_side_cx, book_top, pos)
+    consult_bottom = place_column(by_id["consult"], nodes, edges, branch, consult_spine_cx, consult_side_cx, content_top, pos)
+
+    bus_y = book_bottom + 14
+    column_bottom = max(book_bottom, class_bottom, consult_bottom)
+    commit_top = column_bottom + 76
+    commit_head, commit_duty = header_block(by_id["commit"]["duty"], canvas_w - 160)
+    commit_content = commit_top + commit_head + 12
+    commit_bottom = place_column(
+        by_id["commit"], nodes, edges, branch, class_spine_cx, commit_side_cx, commit_content, pos
+    )
+    commit_rights = [pos[nid].right for nid in by_id["commit"]["nodes"]]
+    commit_rail = max(commit_rights) + 32
+    canvas_w = max(canvas_w, int(commit_rail + 36))
+    loop_y = commit_bottom + 28
+    canvas_h = loop_y + 22
+    CANVAS_W = canvas_w
+
+    hand_x = pos["q_ask"].right + 34
+    if hand_x > class_x + class_w - 14:
+        hand_x = class_x + class_w - 14
+    regions = {
+        "canvas_w": canvas_w,
+        "canvas_h": canvas_h,
+        "y_above": y_above,
+        "y_hand": y_hand,
+        "content_top": content_top,
+        "legend_bottom": legend_bottom,
+        "bus_y": bus_y,
+        "loop_y": loop_y,
+        "commit_rail": commit_rail,
+        "spine_cx": class_spine_cx,
+        "lanes": {
+            "outer": 16,
+            "drop": book_x + book_w + 26,
+            "join": book_x + book_w + 40,
+            "class_return": class_x + 16,
+            "class_loop": pos["input"].left - 20,
+            "back": pos["q_ask"].right + 16,
+            "hand": hand_x,
+            "gap_r": class_x + class_w + 42,
+            "consult_rail": consult_x + consult_w - 16,
+            "book_rail": book_rail,
+        },
+        "columns": [],
+        "commit": {
+            "x": 30,
+            "y": commit_top,
+            "w": canvas_w - 46,
+            "h": loop_y - commit_top - 8,
+            "head_h": commit_head,
+            "duty_lines": commit_duty,
+            "notch": class_spine_cx,
+            "title": by_id["commit"]["title"],
+        },
+    }
+    frames = [
+        ("book", book_x, book_w, book_bottom + 8),
+        ("classify", class_x, class_w, class_bottom),
+        ("consult", consult_x, consult_w, consult_bottom),
+    ]
+    for key, x, width, bottom in frames:
+        head, lines = heads[key]
+        regions["columns"].append(
+            {
+                "band": by_id[key],
+                "x": x,
+                "y": col_top,
+                "w": width,
+                "h": bottom - col_top + 12,
+                "head_h": head_h,
+                "duty_lines": lines,
+                "title_right": hand_x - 12 if key == "classify" else x + width,
+            }
+        )
+    regions["geo"] = {
+        "book_x": book_x,
+        "book_right": book_x + book_w,
+        "class_x": class_x,
+        "class_right": class_x + class_w,
+        "consult_x": consult_x,
+        "consult_right": consult_x + consult_w,
+    }
     return pos, regions
 
 
 def esc(text):
-    return (
-        text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def draw_lines(cx, cy, lines, fill, font, weight="400"):
@@ -534,7 +504,7 @@ def draw_shape(node, box, color):
 def draw_label(x, y, text):
     if not text:
         return ""
-    width = text_width(text, 12) + 12
+    width = text_width(text, 12) + 14
     height = 18
     return (
         f'<rect x="{x - width / 2:.1f}" y="{y - height / 2:.1f}" width="{width:.1f}" height="{height}" rx="4" '
@@ -545,29 +515,307 @@ def draw_label(x, y, text):
 
 
 def path_of(points, dotted=False, arrow=True):
-    if len(points) < 2:
+    cleaned = []
+    for point in points:
+        if not cleaned or abs(cleaned[-1][0] - point[0]) > 0.4 or abs(cleaned[-1][1] - point[1]) > 0.4:
+            cleaned.append(point)
+    if len(cleaned) < 2:
         return ""
-    d = "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in points)
+    d = "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in cleaned)
     dash = ' stroke-dasharray="7 5"' if dotted else ""
     marker = ' marker-end="url(#arrow)"' if arrow else ""
-    return (
-        f'<path d="{d}" fill="none" stroke="{ARROW}" stroke-width="1.5"{dash}{marker}/>'
+    return f'<path d="{d}" fill="none" stroke="{ARROW}" stroke-width="1.7" stroke-linejoin="round"{dash}{marker}/>'
+
+
+class Route:
+    def __init__(self, points, label="", dotted=False, arrow=True, label_at=None, tag=""):
+        self.points = points
+        self.label = label
+        self.dotted = dotted
+        self.arrow = arrow
+        self.label_at = label_at
+        self.tag = tag
+
+
+def anchor(node, box, side):
+    skew = 16 if node.kind in {"io", "out"} else 0
+    if side == "left":
+        return (box.left + skew / 2, box.cy) if skew else (box.left, box.cy)
+    if side == "right":
+        return (box.right - skew / 2, box.cy) if skew else (box.right, box.cy)
+    if side == "top":
+        if skew:
+            return ((box.left + skew + box.right) / 2, box.top)
+        return (box.cx, box.top)
+    if skew:
+        return ((box.left + box.right - skew) / 2, box.bottom)
+    return (box.cx, box.bottom)
+
+
+def elbow(a, b):
+    if abs(a[0] - b[0]) < 6 or abs(a[1] - b[1]) < 6:
+        return [a, b]
+    return [a, (b[0], a[1]), b]
+
+
+def label_near(a, b, text):
+    if abs(a[0] - b[0]) >= abs(a[1] - b[1]):
+        return ((a[0] + b[0]) / 2, a[1] - 14)
+    y = a[1] + 16 if b[1] > a[1] else a[1] - 16
+    if abs(b[1] - a[1]) < 70:
+        y = (a[1] + b[1]) / 2
+    return (a[0] + 18, y)
+
+
+def diamond_lower_left(box):
+    # 左顶点往下沿边，避开正左和正下两个口
+    t = 0.46
+    x = box.left + t * (box.cx - box.left)
+    y = box.cy + t * (box.bottom - box.cy)
+    return x, y
+
+
+def build_routes(nodes, edges, pos, regions):
+    lanes = regions["lanes"]
+    routes = []
+    used = set()
+
+    def add(points, label="", dotted=False, arrow=True, label_at=None, tag=""):
+        routes.append(Route(points, label, dotted, arrow, label_at, tag))
+
+    # 交给预约：从判断左侧进入列间空隙，向上接到预约第一问的右侧
+    slot = pos["is_slot"]
+    cancel = pos["book_cancel"]
+    hand_label = next(edge.label for edge in edges if edge.src == "is_slot" and edge.dst == "book_cancel")
+    add(
+        [
+            anchor(nodes["is_slot"], slot, "left"),
+            (lanes["drop"], slot.cy),
+            (lanes["drop"], cancel.cy),
+            anchor(nodes["book_cancel"], cancel, "right"),
+        ],
+        hand_label,
+        label_at=(lanes["drop"] + 36, (slot.cy + cancel.cy) / 2),
+        tag="handoff-book",
     )
+    used.add(("is_slot", "book_cancel"))
+
+    # 交给咨询：右空隙里拐进咨询入口的左侧
+    question = pos["is_question"]
+    consult_in = pos["consult_in"]
+    consult_label = next(edge.label for edge in edges if edge.src == "is_question" and edge.dst == "consult_in")
+    add(
+        [
+            anchor(nodes["is_question"], question, "right"),
+            (lanes["gap_r"], question.cy),
+            (lanes["gap_r"], consult_in.cy),
+            anchor(nodes["consult_in"], consult_in, "left"),
+        ],
+        consult_label,
+        label_at=(lanes["gap_r"] + 28, (question.cy + consult_in.cy) / 2),
+        tag="handoff-consult",
+    )
+    used.add(("is_question", "consult_in"))
+
+    # 还有片段：从菱形左下侧先落到框外，再沿归类列左边降到两栏之间的空白，贴预约列左缘升回空带
+    more = pos["more"]
+    q_ctx = pos["q_ctx"]
+    x_lane = lanes["class_loop"]
+    x_rise = regions["geo"]["class_x"] - 18
+    x_out = regions["geo"]["book_x"] + 14
+    y_under = regions["commit"]["y"] - 28
+    y_back = cancel.top - 40
+    t = 0.86
+    leave = (
+        more.left + t * (more.cx - more.left),
+        more.cy + t * (more.bottom - more.cy),
+    )
+    x_drop = leave[0] - 32
+    y_clear = more.bottom + 52
+    more_label = next(edge.label for edge in edges if edge.src == "more" and edge.dst == "q_ctx")
+    add(
+        [
+            leave,
+            (x_drop, leave[1]),
+            (x_drop, y_clear),
+            (x_rise, y_clear),
+            (x_rise, y_under),
+            (x_out, y_under),
+            (x_out, y_back),
+            (x_lane, y_back),
+            (x_lane, q_ctx.cy),
+            anchor(nodes["q_ctx"], q_ctx, "left"),
+        ],
+        more_label,
+        dotted=True,
+        label_at=((regions["geo"]["book_x"] + regions["geo"]["book_right"]) / 2, y_back),
+        tag="loop-more",
+    )
+    used.add(("more", "q_ctx"))
+
+    # 回到补全：澄清追问右侧上去，进入上下文补全的右侧
+    q_ask = pos["q_ask"]
+    back_label = next(edge.label for edge in edges if edge.src == "q_ask" and edge.dst == "q_ctx")
+    back_mid_y = (q_ask.cy + q_ctx.cy) / 2
+    add(
+        [
+            anchor(nodes["q_ask"], q_ask, "right"),
+            (lanes["back"], q_ask.cy),
+            (lanes["back"], q_ctx.cy),
+            anchor(nodes["q_ctx"], q_ctx, "right"),
+        ],
+        back_label,
+        dotted=True,
+        label_at=((anchor(nodes["q_ctx"], q_ctx, "right")[0] + lanes["back"]) / 2, q_ctx.cy - 14),
+        tag="loop-ask",
+    )
+    used.add(("q_ask", "q_ctx"))
+    del back_mid_y
+
+    # 下一句：从页边升到输入的高度，横穿预约列顶部的空区，进入输入左侧
+    nxt = pos["next_sentence"]
+    entered = pos["input"]
+    entry = anchor(nodes["input"], entered, "left")
+    add(
+        [
+            anchor(nodes["next_sentence"], nxt, "bottom"),
+            (nxt.cx, regions["loop_y"]),
+            (lanes["outer"], regions["loop_y"]),
+            (lanes["outer"], entry[1]),
+            entry,
+        ],
+        "下一句",
+        dotted=True,
+        label_at=(regions["geo"]["book_x"] + 160, entry[1] - 18),
+        tag="loop-next",
+    )
+    used.add(("next_sentence", "input"))
+
+    # 改草稿的结果，沿左轨汇到「还有片段吗」的左下边
+    attach = diamond_lower_left(more)
+    book_sources = [edge for edge in edges if edge.kind == "join" and nodes[edge.src].band == "book"]
+    rail_x = lanes["book_rail"]
+    top_y = None
+    for edge in book_sources:
+        box = pos[edge.src]
+        start = anchor(nodes[edge.src], box, "left")
+        add([start, (rail_x, start[1])], arrow=False, tag=f"join-{edge.src}")
+        top_y = start[1] if top_y is None else min(top_y, start[1])
+        used.add((edge.src, edge.dst))
+    if book_sources and top_y is not None:
+        add(
+            [
+                (rail_x, top_y),
+                (rail_x, regions["bus_y"]),
+                (lanes["join"], regions["bus_y"]),
+                (lanes["join"], attach[1]),
+                attach,
+            ],
+            "汇合",
+            label_at=((lanes["join"] + attach[0]) / 2, attach[1] - 14),
+            tag="join-book",
+        )
+
+    # 咨询的结果，沿右轨在「还有片段吗」的高度汇入右侧
+    consult_sources = [edge for edge in edges if edge.kind == "join" and nodes[edge.src].band == "consult"]
+    consult_rail = lanes["consult_rail"]
+    consult_top = None
+    for edge in consult_sources:
+        box = pos[edge.src]
+        start = anchor(nodes[edge.src], box, "right")
+        add([start, (consult_rail, start[1])], arrow=False, tag=f"join-{edge.src}")
+        consult_top = start[1] if consult_top is None else min(consult_top, start[1])
+        used.add((edge.src, edge.dst))
+    if consult_sources and consult_top is not None:
+        more_right = anchor(nodes["more"], more, "right")
+        add(
+            [
+                (consult_rail, consult_top),
+                (consult_rail, more_right[1]),
+                more_right,
+            ],
+            "汇合",
+            label_at=((consult_rail + more_right[0]) / 2, more_right[1] - 14),
+            tag="join-consult",
+        )
+
+    # 落单结果汇到「本句结束」的右侧
+    end = pos["sentence_end"]
+    end_right = anchor(nodes["sentence_end"], end, "right")
+    commit_sources = [edge for edge in edges if edge.kind == "join" and nodes[edge.src].band == "commit"]
+    commit_rail = regions["commit_rail"]
+    rows = {}
+    for edge in commit_sources:
+        box = pos[edge.src]
+        rows.setdefault(round(box.cy / 8), []).append(edge)
+        used.add((edge.src, edge.dst))
+    rail_ys = []
+    for group in rows.values():
+        if len(group) == 1:
+            edge = group[0]
+            start = anchor(nodes[edge.src], pos[edge.src], "right")
+            add([start, (commit_rail, start[1])], arrow=False, tag=f"join-{edge.src}")
+            rail_ys.append(start[1])
+            continue
+        bus = max(pos[edge.src].bottom for edge in group) + 14
+        left_x = min(pos[edge.src].cx for edge in group)
+        for edge in group:
+            add([(pos[edge.src].cx, pos[edge.src].bottom), (pos[edge.src].cx, bus)], arrow=False, tag=f"join-{edge.src}")
+        add([(left_x, bus), (commit_rail, bus)], arrow=False, tag="join-bus")
+        rail_ys.append(bus)
+    if rail_ys:
+        add(
+            [(commit_rail, min(rail_ys)), (commit_rail, end_right[1]), end_right],
+            "汇合",
+            label_at=((commit_rail + end_right[0]) / 2, end_right[1] - 14),
+            tag="join-commit",
+        )
+
+    for edge in edges:
+        key = (edge.src, edge.dst)
+        if key in used or edge.kind in {"join", "loop"}:
+            continue
+        src_n = nodes[edge.src]
+        dst_n = nodes[edge.dst]
+        src = pos[edge.src]
+        dst = pos[edge.dst]
+        if edge.kind == "down":
+            a = anchor(src_n, src, "bottom")
+            b = anchor(dst_n, dst, "top")
+            points = [a, b] if abs(a[0] - b[0]) < 8 else [a, (a[0], (a[1] + b[1]) / 2), (b[0], (a[1] + b[1]) / 2), b]
+            add(points, edge.label, label_at=label_near(a, b, edge.label), tag=f"down-{edge.src}")
+        elif edge.kind == "right":
+            if dst.cx < src.cx:
+                a = anchor(src_n, src, "left")
+                b = anchor(dst_n, dst, "right")
+            else:
+                a = anchor(src_n, src, "right")
+                b = anchor(dst_n, dst, "left")
+            points = [a, b] if abs(a[1] - b[1]) < 8 else [a, ((a[0] + b[0]) / 2, a[1]), ((a[0] + b[0]) / 2, b[1]), b]
+            add(points, edge.label, label_at=label_near(a, b, edge.label), tag=f"right-{edge.src}")
+        elif edge.kind in {"yes", "no"}:
+            continue
+        used.add(key)
+
+    for edge in edges:
+        if edge.kind != "yes":
+            continue
+        pair = [item for item in edges if item.src == edge.src and item.kind == "no"]
+        if not pair:
+            continue
+        src = pos[edge.src]
+        yes = pos[edge.dst]
+        no = pos[pair[0].dst]
+        stem = src.bottom + 14
+        add([(src.cx, src.bottom), (src.cx, stem)], arrow=False, tag=f"fork-{edge.src}")
+        add([(yes.cx, stem), (no.cx, stem)], arrow=False, tag=f"fork-bus-{edge.src}")
+        add([(yes.cx, stem), (yes.cx, anchor(nodes[edge.dst], yes, "top")[1])], edge.label, label_at=(yes.cx, (stem + yes.top) / 2), tag=f"yes-{edge.dst}")
+        add([(no.cx, stem), (no.cx, anchor(nodes[pair[0].dst], no, "top")[1])], pair[0].label, label_at=(no.cx, (stem + no.top) / 2), tag=f"no-{pair[0].dst}")
+
+    return routes
 
 
-def label_on(a, b, text, long_from_start=False):
-    if not text:
-        return ""
-    x1, y1 = a
-    x2, y2 = b
-    if long_from_start or (abs(y2 - y1) > 90 and abs(x2 - x1) < 30):
-        return draw_label(x1 + 28, y1 + 18, text)
-    if abs(x2 - x1) >= abs(y2 - y1):
-        return draw_label((x1 + x2) / 2, y1 - 14, text)
-    return draw_label(x1 + 26, (y1 + y2) / 2, text)
-
-
-def overlaps(a, b, pad=6):
+def overlaps(a, b, pad=8):
     return not (
         a.right + pad <= b.left
         or b.right + pad <= a.left
@@ -576,29 +824,24 @@ def overlaps(a, b, pad=6):
     )
 
 
-def render(bands, nodes, edges, branch, pos, regions):
-    parts = []
+def render(bands, nodes, edges, branch, pos, regions, routes):
+    del bands, edges, branch
+    width = regions["canvas_w"]
     height = int(regions["canvas_h"])
-    width = CANVAS_W
-    parts.append(
-        f'<rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>'
-    )
-    # Legend: three robot chips
+    parts = [f'<rect x="0" y="0" width="{width}" height="{height}" fill="#ffffff"/>']
     chips = [
-        ("classify", "归类机器人", "拆句并分流。进度和闲聊自己答"),
-        ("book", "预约机器人", "确认完整摘要后才写入"),
-        ("consult", "咨询机器人", "带上问句和草稿里已知槽位"),
+        ("book", "预约 · 改草稿", "取消、同意、拒绝、改槽，只改草稿"),
+        ("classify", "归类", "明确后向左交给预约，向右交给咨询"),
+        ("consult", "咨询", "只回答已经明确的问题"),
     ]
-    chip_w = 304
+    chip_w = 430
     for index, (key, title, duty) in enumerate(chips):
-        x = 18 + index * (chip_w + 12)
+        x = 20 + index * (chip_w + 14)
         color = COLORS[key]
         parts.append(
             f'<rect x="{x}" y="14" width="{chip_w}" height="62" rx="8" fill="{color["bg"]}" stroke="{color["stroke"]}"/>'
         )
-        parts.append(
-            f'<rect x="{x}" y="14" width="8" height="62" rx="3" fill="{color["head"]}"/>'
-        )
+        parts.append(f'<rect x="{x}" y="14" width="8" height="62" fill="{color["head"]}"/>')
         parts.append(
             f'<text x="{x + 20}" y="36" font-family="Microsoft YaHei, PingFang SC, sans-serif" '
             f'font-size="15" font-weight="700" fill="{color["head"]}">{esc(title)}</text>'
@@ -608,191 +851,87 @@ def render(bands, nodes, edges, branch, pos, regions):
             f'font-size="12" fill="{INK}">{esc(duty)}</text>'
         )
     parts.append(
-        '<text x="20" y="96" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="12" fill="#5c6773">'
-        "平行四边形是输入或输出，菱形是判断，矩形是处理。向下继续判断，向右是这一支的结果。虚线是回路。"
+        '<text x="22" y="96" font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="12" fill="#5c6773">'
+        "上端从左到右：预约改草稿、归类、咨询。下端：预约落单。向下继续，向旁是结果。虚线是回路。"
         "</text>"
     )
 
-    # Left column background
-    if "left_header" in regions:
-        header = regions["left_header"]
-        bottom = regions["left_bottom"]
-        parts.append(
-            f'<rect x="64" y="{header.y:.1f}" width="348" height="{bottom - header.y + 8:.1f}" rx="12" '
-            f'fill="{COLORS["classify"]["bg"]}" stroke="{COLORS["classify"]["stroke"]}" stroke-width="1.4"/>'
-        )
-        parts.append(
-            f'<rect x="64" y="{header.y:.1f}" width="348" height="28" rx="8" fill="{COLORS["classify"]["head"]}"/>'
-        )
-        parts.append(
-            f'<text x="80" y="{header.y + 18:.1f}" font-family="Microsoft YaHei, PingFang SC, sans-serif" '
-            f'font-size="14" font-weight="700" fill="#ffffff">{esc(regions["left_title"])}</text>'
-        )
-        for index, line in enumerate(regions["left_duty_lines"]):
-            parts.append(
-                f'<text x="80" y="{header.y + 46 + index * 16:.1f}" font-family="Microsoft YaHei, PingFang SC, sans-serif" '
-                f'font-size="12" fill="{INK}">{esc(line)}</text>'
-            )
-
-    for panel in regions["panels"]:
-        band = panel["band"]
-        group = band["group"]
-        color = COLORS[group]
-        x = panel["left"]
-        y = panel["header_top"]
-        w = panel["right"] - panel["left"]
-        h = panel["bottom"] - panel["header_top"]
+    for column in regions["columns"]:
+        band = column["band"]
+        color = COLORS[band["group"]]
+        x, y, w, h = column["x"], column["y"], column["w"], column["h"]
         parts.append(
             f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="12" '
             f'fill="{color["bg"]}" stroke="{color["stroke"]}" stroke-width="1.6"/>'
         )
+        title_w = min(w, column["title_right"] - x)
         parts.append(
-            f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="28" rx="8" fill="{color["head"]}"/>'
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{title_w:.1f}" height="28" fill="{color["head"]}"/>'
         )
         parts.append(
-            f'<text x="{x + 14:.1f}" y="{y + 18:.1f}" font-family="Microsoft YaHei, PingFang SC, sans-serif" '
-            f'font-size="14" font-weight="700" fill="#ffffff">{esc(band["title"])}</text>'
+            f'<text x="{x + 14:.1f}" y="{y + 19:.1f}" font-family="Microsoft YaHei, PingFang SC, sans-serif" '
+            f'font-size="15" font-weight="700" fill="#ffffff">{esc(band["title"])}</text>'
         )
-        for index, line in enumerate(panel["duty_lines"]):
+        for index, line in enumerate(column["duty_lines"]):
             parts.append(
-                f'<text x="{x + 14:.1f}" y="{y + 46 + index * 16:.1f}" '
+                f'<text x="{x + 14:.1f}" y="{y + 48 + index * 16:.1f}" '
                 f'font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="12" fill="{INK}">{esc(line)}</text>'
             )
 
-    if "commit_header" in regions:
-        header = regions["commit_header"]
-        color = COLORS["book"]
-        bottom = regions["canvas_h"] - 12
+    commit = regions["commit"]
+    color = COLORS["book"]
+    notch = commit["notch"]
+    parts.append(
+        f'<rect x="{commit["x"]:.1f}" y="{commit["y"]:.1f}" width="{commit["w"]:.1f}" height="{commit["h"]:.1f}" rx="12" '
+        f'fill="{color["bg"]}" stroke="{color["stroke"]}" stroke-width="1.6"/>'
+    )
+    left_w = notch - 16 - commit["x"]
+    if left_w > 20:
         parts.append(
-            f'<rect x="28" y="{header.y:.1f}" width="{CANVAS_W - 44}" height="{bottom - header.y:.1f}" rx="12" '
-            f'fill="{color["bg"]}" stroke="{color["stroke"]}" stroke-width="1.6"/>'
+            f'<rect x="{commit["x"]:.1f}" y="{commit["y"]:.1f}" width="{left_w:.1f}" height="28" fill="{color["head"]}"/>'
         )
-        # Leave a channel on the spine so the incoming arrow does not cross the title.
+    right_x = notch + 16
+    right_w = commit["x"] + commit["w"] - right_x
+    parts.append(
+        f'<rect x="{right_x:.1f}" y="{commit["y"]:.1f}" width="{right_w:.1f}" height="28" fill="{color["head"]}"/>'
+    )
+    parts.append(
+        f'<text x="{right_x + 12:.1f}" y="{commit["y"] + 19:.1f}" font-family="Microsoft YaHei, PingFang SC, sans-serif" '
+        f'font-size="15" font-weight="700" fill="#ffffff">{esc(commit["title"])}</text>'
+    )
+    for index, line in enumerate(commit["duty_lines"]):
         parts.append(
-            f'<rect x="250" y="{header.y:.1f}" width="{CANVAS_W - 280}" height="28" rx="8" fill="{color["head"]}"/>'
+            f'<text x="{right_x + 12:.1f}" y="{commit["y"] + 48 + index * 16:.1f}" '
+            f'font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="12" fill="{INK}">{esc(line)}</text>'
         )
-        parts.append(
-            f'<text x="266" y="{header.y + 18:.1f}" font-family="Microsoft YaHei, PingFang SC, sans-serif" '
-            f'font-size="14" font-weight="700" fill="#ffffff">{esc(regions["commit_title"])}</text>'
-        )
-        for index, line in enumerate(regions["commit_duty_lines"]):
-            parts.append(
-                f'<text x="266" y="{header.y + 46 + index * 16:.1f}" '
-                f'font-family="Microsoft YaHei, PingFang SC, sans-serif" font-size="12" fill="{INK}">{esc(line)}</text>'
-            )
 
-    # Edges
-    edge_svg = []
-    for edge in edges:
-        if edge.kind in {"join", "loop"}:
+    for route in routes:
+        parts.append(path_of(route.points, dotted=route.dotted, arrow=route.arrow))
+    for route in routes:
+        if not route.label:
             continue
-        if edge.src not in pos or edge.dst not in pos:
-            continue
-        src = pos[edge.src]
-        dst = pos[edge.dst]
-        if edge.kind == "right":
-            a = (src.right, src.cy)
-            b = (dst.left, dst.cy if abs(dst.cy - src.cy) < 36 else dst.cy)
-            if abs(a[1] - b[1]) < 8:
-                edge_svg.append(path_of([a, b]))
-                edge_svg.append(label_on(a, b, edge.label))
-            else:
-                mid_x = (a[0] + b[0]) / 2
-                edge_svg.append(path_of([a, (mid_x, a[1]), (mid_x, b[1]), b]))
-                edge_svg.append(draw_label(mid_x, (a[1] + b[1]) / 2, edge.label))
-        elif edge.kind == "down":
-            a = (src.cx, src.bottom)
-            b = (dst.cx, dst.top)
-            if abs(a[0] - b[0]) < 8:
-                edge_svg.append(path_of([a, b]))
-                edge_svg.append(label_on(a, b, edge.label))
-            else:
-                mid_y = (a[1] + b[1]) / 2
-                edge_svg.append(path_of([a, (a[0], mid_y), (b[0], mid_y), b]))
-                edge_svg.append(draw_label((a[0] + b[0]) / 2, mid_y - 12, edge.label))
-        elif edge.kind in {"yes", "no"}:
-            a = (src.cx - 28 if edge.kind == "yes" else src.cx + 28, src.bottom)
-            b = (dst.cx, dst.top)
-            edge_svg.append(path_of([a, b]))
-            edge_svg.append(draw_label((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 - 8, edge.label))
+        if route.label_at:
+            lx, ly = route.label_at
+        else:
+            lx, ly = label_near(route.points[0], route.points[-1], route.label)
+        parts.append(draw_label(lx, ly, route.label))
 
-    # Joins share a rail per target
-    joins = {}
-    for edge in edges:
-        if edge.kind == "join":
-            joins.setdefault(edge.dst, []).append(edge)
-    def hits_node(x1, x2, y, skip):
-        left, right = min(x1, x2), max(x1, x2)
-        for nid, box in pos.items():
-            if nid in skip:
-                continue
-            if box.top + 3 < y < box.bottom - 3 and box.left < right and box.right > left:
-                return True
-        return False
-
-    for target, group in joins.items():
-        if target not in pos:
-            continue
-        dst = pos[target]
-        rail_x = RAIL_X
-        rows = {}
-        for edge in group:
-            src = pos[edge.src]
-            rows.setdefault(round(src.cy / 6), []).append(edge)
-        ys = []
-        for row in rows.values():
-            boxes = [(edge, pos[edge.src]) for edge in row]
-            needs_bus = len(boxes) > 1 or any(
-                hits_node(box.right, rail_x, box.cy, {edge.src}) for edge, box in boxes
-            )
-            if not needs_bus:
-                edge, box = boxes[0]
-                edge_svg.append(path_of([(box.right, box.cy), (rail_x, box.cy)], arrow=False))
-                ys.append(box.cy)
-                continue
-            bus_y = max(box.bottom for _, box in boxes) + 16
-            left_x = min(box.cx for _, box in boxes)
-            for _, box in boxes:
-                edge_svg.append(path_of([(box.cx, box.bottom), (box.cx, bus_y)], arrow=False))
-            edge_svg.append(path_of([(left_x, bus_y), (rail_x, bus_y)], arrow=False))
-            ys.append(bus_y)
-        top_y = min(ys)
-        edge_svg.append(path_of([(rail_x, top_y), (rail_x, dst.cy), (dst.right, dst.cy)]))
-        edge_svg.append(draw_label((rail_x + dst.right) / 2, dst.cy - 14, "汇合"))
-
-    loops = [edge for edge in edges if edge.kind == "loop"]
-    loops.sort(key=lambda edge: abs(pos[edge.src].cy - pos[edge.dst].cy), reverse=True)
-    for index, edge in enumerate(loops):
-        lane = 18 + index * 28
-        src = pos[edge.src]
-        dst = pos[edge.dst]
-        edge_svg.append(
-            path_of(
-                [(src.left, src.cy), (lane, src.cy), (lane, dst.cy), (dst.left, dst.cy)],
-                dotted=True,
-            )
-        )
-        label_w = text_width(edge.label, 12) + 12
-        label_x = dst.left - 8 - label_w / 2
-        if label_x < label_w / 2 + 4:
-            label_x = label_w / 2 + 4
-        edge_svg.append(draw_label(label_x, dst.cy - 16, edge.label))
-
-    parts.extend(edge_svg)
-    band_group = {band["id"]: band["group"] for band in bands}
+    band_group = {}
+    for column in regions["columns"]:
+        band_group[column["band"]["id"]] = column["band"]["group"]
+    band_group["commit"] = "book"
     for nid, node in nodes.items():
         if nid not in pos:
             continue
-        group = band_group[node.band]
-        color = COLORS.get(group, COLORS["classify"])
+        color = COLORS[band_group.get(node.band, "classify")]
         parts.append(draw_shape(node, pos[nid], color))
 
     svg = (
-        f'<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
         f'viewBox="0 0 {width} {height}">\n'
-        f'<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">'
-        f'<path d="M 0 1.2 L 8 5 L 0 8.8 z" fill="{ARROW}"/></marker></defs>\n'
+        '<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">'
+        f'<path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="{ARROW}"/></marker></defs>\n'
         + "\n".join(parts)
         + "\n</svg>\n"
     )
@@ -813,6 +952,107 @@ def report_overlaps(nodes, pos):
     return hits
 
 
+def _between(value, left, right):
+    return min(left, right) + 0.6 < value < max(left, right) - 0.6
+
+
+def segments_cross(a, b, c, d):
+    horizontal_ab = abs(a[1] - b[1]) < 0.6
+    horizontal_cd = abs(c[1] - d[1]) < 0.6
+    vertical_ab = abs(a[0] - b[0]) < 0.6
+    vertical_cd = abs(c[0] - d[0]) < 0.6
+    if horizontal_ab and horizontal_cd:
+        if abs(a[1] - c[1]) > 0.8:
+            return False
+        return min(max(a[0], b[0]), max(c[0], d[0])) - max(min(a[0], b[0]), min(c[0], d[0])) > 0.8
+    if vertical_ab and vertical_cd:
+        if abs(a[0] - c[0]) > 0.8:
+            return False
+        return min(max(a[1], b[1]), max(c[1], d[1])) - max(min(a[1], b[1]), min(c[1], d[1])) > 0.8
+    if horizontal_ab and vertical_cd:
+        return _between(c[0], a[0], b[0]) and _between(a[1], c[1], d[1])
+    if vertical_ab and horizontal_cd:
+        return _between(a[0], c[0], d[0]) and _between(c[1], a[1], b[1])
+    return False
+
+
+def segment_hits_box(a, b, box):
+    inset = 6
+    left, top, right, bottom = box.left + inset, box.top + inset, box.right - inset, box.bottom - inset
+    if right <= left or bottom <= top:
+        return False
+    if abs(a[1] - b[1]) < 0.6:
+        y = a[1]
+        if not (top < y < bottom):
+            return False
+        return min(max(a[0], b[0]), right) - max(min(a[0], b[0]), left) > 1
+    if abs(a[0] - b[0]) < 0.6:
+        x = a[0]
+        if not (left < x < right):
+            return False
+        return min(max(a[1], b[1]), bottom) - max(min(a[1], b[1]), top) > 1
+    return False
+
+
+def trim_segment(a, b, start=7, end=16):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    length = (dx * dx + dy * dy) ** 0.5
+    if length <= start + end + 2:
+        return None
+    ux, uy = dx / length, dy / length
+    return (a[0] + ux * start, a[1] + uy * start), (b[0] - ux * end, b[1] - uy * end)
+
+
+def on_shape(node, box, x, y):
+    if node.kind == "ask":
+        nx = abs(x - box.cx) / (box.w / 2)
+        ny = abs(y - box.cy) / (box.h / 2)
+        return abs(nx + ny - 1) <= 0.08
+    skew = 16 if node.kind in {"io", "out"} else 0
+    on_top = abs(y - box.top) <= 3 and box.left + skew - 4 <= x <= box.right + 4
+    on_bottom = abs(y - box.bottom) <= 3 and box.left - 4 <= x <= box.right - skew + 4
+    on_left = abs(x - (box.left + skew / 2 if skew else box.left)) <= 4 and box.top - 3 <= y <= box.bottom + 3
+    on_right = abs(x - (box.right - skew / 2 if skew else box.right)) <= 4 and box.top - 3 <= y <= box.bottom + 3
+    return on_top or on_bottom or on_left or on_right
+
+
+def report_routes(routes, nodes, pos):
+    crosses = []
+    pierces = []
+    misses = []
+    segments = []
+    for route in routes:
+        for index in range(len(route.points) - 1):
+            segments.append((route.tag, route.points[index], route.points[index + 1], index == len(route.points) - 2 and route.arrow))
+    for i, (tag_a, a1, a2, _) in enumerate(segments):
+        for tag_b, b1, b2, _ in segments[i + 1 :]:
+            if segments_cross(a1, a2, b1, b2):
+                crosses.append(f"{tag_a} x {tag_b} | {a1[0]:.0f},{a1[1]:.0f}-{a2[0]:.0f},{a2[1]:.0f} | {b1[0]:.0f},{b1[1]:.0f}-{b2[0]:.0f},{b2[1]:.0f}")
+        trimmed = trim_segment(a1, a2)
+        if not trimmed:
+            continue
+        for nid, box in pos.items():
+            node = nodes[nid]
+            if on_shape(node, box, a1[0], a1[1]) or on_shape(node, box, a2[0], a2[1]):
+                continue
+            if segment_hits_box(trimmed[0], trimmed[1], box):
+                pierces.append(f"{tag_a} through {nid}")
+    for route in routes:
+        if not route.arrow:
+            continue
+        end = route.points[-1]
+        # 落在任一节点边界上即可。汇合线的终点就是目标。
+        if not any(on_shape(nodes[nid], box, end[0], end[1]) for nid, box in pos.items()):
+            misses.append(f"{route.tag} -> ({end[0]:.0f},{end[1]:.0f})")
+    for item in crosses:
+        print("cross", item)
+    for item in pierces:
+        print("pierce", item)
+    for item in misses:
+        print("miss", item)
+    return crosses, pierces, misses
+
+
 def export_png(width, height):
     edge_candidates = [
         Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
@@ -824,7 +1064,11 @@ def export_png(width, height):
         return
     port = 8771
     handler = http.server.SimpleHTTPRequestHandler
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
+    try:
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
+    except OSError:
+        port += 1
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     cwd = os.getcwd()
     os.chdir(ROOT)
@@ -838,7 +1082,7 @@ def export_png(width, height):
                 "--disable-gpu",
                 "--hide-scrollbars",
                 "--force-device-scale-factor=1",
-                f"--window-size={width},{height}",
+                f"--window-size={width},{min(height, 8000)}",
                 f"--screenshot={PNG}",
                 url,
             ],
@@ -862,10 +1106,16 @@ def main():
     if missing:
         raise SystemExit("这些节点没有排上位置：" + ", ".join(missing))
     hits = report_overlaps(nodes, pos)
-    svg = render(bands, nodes, edges, branch, pos, regions)
+    routes = build_routes(nodes, edges, pos, regions)
+    crosses, pierces, misses = report_routes(routes, nodes, pos)
+    svg = render(bands, nodes, edges, branch, pos, regions, routes)
     SVG.write_text(svg, encoding="utf-8")
-    print(f"svg {CANVAS_W}x{int(regions['canvas_h'])} nodes {len(pos)} overlaps {len(hits)}")
-    export_png(CANVAS_W, int(regions["canvas_h"]))
+    print(
+        f"svg {regions['canvas_w']}x{int(regions['canvas_h'])} nodes {len(pos)} "
+        f"overlaps {len(hits)} crosses {len(crosses)} pierces {len(pierces)} misses {len(misses)}"
+    )
+    if os.environ.get("SKIP_PNG") != "1" and not crosses and not pierces and not misses and not hits:
+        export_png(regions["canvas_w"], int(regions["canvas_h"]))
 
 
 if __name__ == "__main__":
